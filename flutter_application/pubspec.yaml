@@ -8,13 +8,20 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  
+  firebase_core: ^3.13.0   # Actualiza firebase_core a la versión compatible
+  firebase_auth: ^5.5.2       # Utiliza la versión más reciente de firebase_auth compatible con el Firebase BoM
+  firebase_analytics: ^11.4.5  # Asegúrate de que la versión de firebase_analytics sea compatible con firebase_core
+  cloud_firestore: ^5.0.0     # Si usas Firestore, este es el paquete adecuado
+  firebase_storage: ^12.4.5   # Si usas almacenamiento en Firebase, este es el paquete adecuado
+  firebase_messaging: ^15.2.5
 
   cupertino_icons: ^1.0.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_launcher_icons: ^0.13.1
+  flutter_launcher_icons: ^0.14.3
 
 flutter_icons:
   android: true

@@ -47,7 +47,7 @@ class _RegistroViewState extends State<RegistroView> {
         // Aquí podrías navegar a la siguiente pantalla
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error en el registro')),
+        const SnackBar(content: Text('Error en el registro')),
         );
       }
     }
@@ -62,7 +62,12 @@ class _RegistroViewState extends State<RegistroView> {
             // Sección verde superior
             Container(
               width: double.infinity,
-              color: const Color(0xFF5A9A7A),
+              decoration: const BoxDecoration(
+                color: Color(0xFF5A9A7A),
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(40),
+                ),
+              ),
               padding: const EdgeInsets.symmetric(vertical: 40),
               child: Column(
                 children: [
@@ -128,7 +133,7 @@ class _RegistroViewState extends State<RegistroView> {
                                 borderSide: BorderSide.none,
                               ),
                               contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 20,
+                                horizontal: 16,
                                 vertical: 16,
                               ),
                             ),
@@ -141,6 +146,7 @@ class _RegistroViewState extends State<RegistroView> {
                 ],
               ),
             ),
+            
             // Sección blanca inferior
             Container(
               height: MediaQuery.of(context).size.height * 0.4,

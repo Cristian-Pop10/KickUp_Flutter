@@ -47,14 +47,14 @@ class _HeaderSection extends StatelessWidget {
             ],
           ),
         ),
-        SizedBox(height: 20),
+        SizedBox(height: 10),
 
         Image.asset(
           'assets/logo.png',
           width: 120,
           height: 120,
         ),
-        SizedBox(height: 40),
+        SizedBox(height: 20),
       ],
     );
   }

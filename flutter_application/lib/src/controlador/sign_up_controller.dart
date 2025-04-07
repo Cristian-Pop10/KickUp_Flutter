@@ -1,26 +1,28 @@
-import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../modelo/signup_model.dart';
 
 class AuthController {
-  // Simulación de autenticación
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
   Future<bool> register(UserModel user) async {
-    // Aquí iría la lógica para registrar al usuario con un servicio de backend
-    // Por ahora, simplemente simulamos un retraso y retornamos true
-    await Future.delayed(const Duration(seconds: 2));
-    
-    // Validación básica
-    if (user.email.isEmpty || !user.email.contains('@')) {
+    try {
+      // Registro real en Firebase Auth
+      await _auth.createUserWithEmailAndPassword(
+        email: user.email,
+        password: user.password,
+      );
+      return true;
+    } on FirebaseAuthException catch (e) {
+      // Puedes manejar errores más específicos aquí
+      print('Error de Firebase: ${e.message}');
+      return false;
+    } catch (e) {
+      print('Error general: $e');
       return false;
     }
-    
-    if (user.password.isEmpty || user.password.length < 6) {
-      return false;
-    }
-    
-    return true;
   }
-  
-  // Validadores para los campos del formulario
+
+  // Validaciones de email y password
   String? validateEmail(String? value) {
     if (value == null || value.isEmpty) {
       return 'Por favor ingresa tu email';
@@ -30,7 +32,7 @@ class AuthController {
     }
     return null;
   }
-  
+
   String? validatePassword(String? value) {
     if (value == null || value.isEmpty) {
       return 'Por favor ingresa tu contraseña';
