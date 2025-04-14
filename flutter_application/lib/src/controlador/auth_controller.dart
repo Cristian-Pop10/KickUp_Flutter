@@ -1,25 +1,25 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import '../modelo/signup_model.dart';
+import '../modelo/user_model.dart';
+import '../servicio/auth_service.dart';
+import '../servicio/user_service.dart';
 
 class AuthController {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final AuthService _authService = AuthService();
 
-  Future<bool> register(UserModel user) async {
-    try {
-      // Registro real en Firebase Auth
-      await _auth.createUserWithEmailAndPassword(
-        email: user.email,
-        password: user.password,
-      );
-      return true;
-    } on FirebaseAuthException catch (e) {
-      // Puedes manejar errores más específicos aquí
-      print('Error de Firebase: ${e.message}');
-      return false;
-    } catch (e) {
-      print('Error general: $e');
-      return false;
-    }
+  Future<bool> register(SignupModel signupModel) async {
+    return await _authService.register(UserModel(
+      email: signupModel.email,
+      password: signupModel.password,
+    ));
+  }
+
+  Future<bool> login(String email, String password) async {
+    return await _authService.login(email, password);
+  }
+
+  Future<void> logout() async {
+    await _authService.logout();
   }
 
   // Validaciones de email y password

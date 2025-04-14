@@ -63,11 +63,11 @@ class UserModel {
       email: json['email'] as String?,
       password: json['password'] as String?,
       profileImageUrl: json['profileImageUrl'] as String?,
-      createdAt: json['createdAt'] != null 
-          ? DateTime.parse(json['createdAt'] as String) 
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'] as String)
           : null,
-      lastLogin: json['lastLogin'] != null 
-          ? DateTime.parse(json['lastLogin'] as String) 
+      lastLogin: json['lastLogin'] != null
+          ? DateTime.parse(json['lastLogin'] as String)
           : null,
     );
   }

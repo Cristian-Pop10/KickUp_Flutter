@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../controlador/sign_up_controller.dart';
+import '../controlador/auth_controller.dart';
 import '../modelo/signup_model.dart';
 
 class RegistroView extends StatefulWidget {
@@ -29,12 +29,12 @@ class _RegistroViewState extends State<RegistroView> {
         _isLoading = true;
       });
 
-      final user = UserModel(
+      final signupModel = SignupModel(
         email: _emailController.text,
         password: _passwordController.text,
       );
 
-      final success = await _authController.register(user);
+      final success = await _authController.register(signupModel);
 
       setState(() {
         _isLoading = false;
@@ -47,7 +47,7 @@ class _RegistroViewState extends State<RegistroView> {
         // Aquí podrías navegar a la siguiente pantalla
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error en el registro')),
+          const SnackBar(content: Text('Error en el registro')),
         );
       }
     }
@@ -149,7 +149,7 @@ class _RegistroViewState extends State<RegistroView> {
             
             // Sección blanca inferior
             Container(
-              height: MediaQuery.of(context).size.height * 0.4,
+              height: MediaQuery.of(context).size.height * 0.5,
               width: double.infinity,
               color: Colors.white,
               child: Column(
@@ -179,9 +179,9 @@ class _RegistroViewState extends State<RegistroView> {
                         ),
                   const SizedBox(height: 30),
                   Image.asset(
-                    'assets/soccer_ball.png',
-                    width: 50,
-                    height: 50,
+                    'assets/arbitro.png',
+                    width: 150,
+                    height: 150,
                   ),
                 ],
               ),

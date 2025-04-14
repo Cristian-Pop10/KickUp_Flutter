@@ -1,8 +1,10 @@
-class UserModel {
+import '../servicio/auth_service.dart';
+
+class SignupModel {
   final String email;
   final String password;
 
-  UserModel({required this.email, required this.password});
+  SignupModel({required this.email, required this.password});
 
   Map<String, dynamic> toJson() {
     return {
@@ -11,10 +13,11 @@ class UserModel {
     };
   }
 
-  factory UserModel.fromJson(Map<String, dynamic> json) {
-    return UserModel(
+  factory SignupModel.fromJson(Map<String, dynamic> json) {
+    return SignupModel(
       email: json['email'] as String,
       password: json['password'] as String,
     );
   }
 }
+
