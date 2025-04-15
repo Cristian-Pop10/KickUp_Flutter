@@ -11,55 +11,56 @@ class LogInPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.grey[200],
       resizeToAvoidBottomInset: true, // Ajusta el contenido al teclado
-      body: Column(
-        children: [
-          // Parte superior con el título y el logo
-          Expanded(
-            flex: 1,
-            child: _HeaderSection(),
-          ),
-
-          // Parte inferior con los campos de texto y el botón
-          Expanded(
-            flex: 1,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                return SingleChildScrollView(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: constraints.maxHeight,
-                    ),
-                    child: IntrinsicHeight(
-                      child: _InputSection(
-                        emailController: _emailController,
-                        passwordController: _passwordController,
-                        onLoginPressed: () async {
-                          String email = _emailController.text.trim();
-                          String password = _passwordController.text.trim();
-
-                          bool success = await _authController.login(email, password);
-
-                          if (success) {
-                            // Inicio de sesión exitoso
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Inicio de sesión exitoso')),
-                            );
-                            // Navega a la pantalla principal o realiza otra acción
-                          } else {
-                            // Error en el inicio de sesión
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Error al iniciar sesión')),
-                            );
-                          }
-                        },
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight,
+                ),
+                child: IntrinsicHeight(
+                  child: Column(
+                    children: [
+                      // Parte superior con el título y el logo
+                      Container(
+                        height: MediaQuery.of(context).size.height * 0.35, // Ocupa el 40% de la pantalla
+                        child: _HeaderSection(),
                       ),
-                    ),
+
+                      // Parte inferior con los campos de texto y el botón
+                      Expanded(
+                        child: _InputSection(
+                          emailController: _emailController,
+                          passwordController: _passwordController,
+                          onLoginPressed: () async {
+                            String email = _emailController.text.trim();
+                            String password = _passwordController.text.trim();
+
+                            bool success = await _authController.login(email, password);
+
+                            if (success) {
+                              // Inicio de sesión exitoso
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Inicio de sesión exitoso')),
+                              );
+                              // Navega a la pantalla principal o realiza otra acción
+                            } else {
+                              // Error en el inicio de sesión
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error al iniciar sesión')),
+                              );
+                            }
+                          },
+                        ),
+                      ),
+                    ],
                   ),
-                );
-              },
-            ),
-          ),
-        ],
+                ),
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -69,7 +70,7 @@ class LogInPage extends StatelessWidget {
 class _HeaderSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -125,7 +126,6 @@ class _InputSection extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.start,
         children: [
           _InputField(
             label: 'USUARIO',
