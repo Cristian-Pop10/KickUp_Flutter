@@ -1,32 +1,35 @@
-// main.dart
 import 'package:flutter/material.dart';
-import 'package:flutter_application/src/vista/log_in_screen.dart';
-import 'package:flutter_application/src/vista/sign_up_screen.dart';
-import 'firebase_options.dart';  // Este archivo es el que genera la configuración de Firebase
+import 'package:flutter_application/src/preferences/pref_usuarios.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+import 'src/vista/log_in_screen.dart';
+import 'src/vista/partidos_screen.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();  // Asegura que el entorno esté listo para la inicialización de Firebase
-
-  // Inicialización de Firebase con la configuración que genera flutterfire
+  WidgetsFlutterBinding.ensureInitialized();
+  await PreferenciasUsuario.init(); // Inicializa las preferencias de usuario
   await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,  // Usando la configuración generada
+    options: DefaultFirebaseOptions.currentPlatform,
   );
 
   runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
+  MyApp({super.key});
+
+  final prefs = PreferenciasUsuario();
+
   @override
   Widget build(BuildContext context) {
+    String email = prefs.userEmail;
+    String lastPage = prefs.ultimaPagina;
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Mi Aplicación Flutter',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      //home: RegistroView(),
-      home: LogInPage(),
+      home: (lastPage == '/partidos' && email.isNotEmpty)
+          ? PartidosView(userId: email)
+          : LogInPage(),
     );
   }
 }

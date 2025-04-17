@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
-import '../controlador/auth_controller.dart'; // Importa tu controlador de autenticación
+import 'package:shared_preferences/shared_preferences.dart';
+import '../controlador/auth_controller.dart';
+import '../preferences/pref_usuarios.dart';
+import 'partidos_screen.dart';
 
 class LogInPage extends StatelessWidget {
+  static const String routeName = '/login';
+  LogInPage({super.key});
+
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final AuthController _authController = AuthController();
@@ -10,7 +16,7 @@ class LogInPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[200],
-      resizeToAvoidBottomInset: true, // Ajusta el contenido al teclado
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -22,13 +28,10 @@ class LogInPage extends StatelessWidget {
                 child: IntrinsicHeight(
                   child: Column(
                     children: [
-                      // Parte superior con el título y el logo
                       Container(
-                        height: MediaQuery.of(context).size.height * 0.35, // Ocupa el 40% de la pantalla
+                        height: MediaQuery.of(context).size.height * 0.35,
                         child: _HeaderSection(),
                       ),
-
-                      // Parte inferior con los campos de texto y el botón
                       Expanded(
                         child: _InputSection(
                           emailController: _emailController,
@@ -37,18 +40,27 @@ class LogInPage extends StatelessWidget {
                             String email = _emailController.text.trim();
                             String password = _passwordController.text.trim();
 
-                            bool success = await _authController.login(email, password);
+                            bool success =
+                                await _authController.login(email, password);
 
                             if (success) {
-                              // Inicio de sesión exitoso
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Inicio de sesión exitoso')),
+                              // Guardar datos en SharedPreferences
+                              PreferenciasUsuario prefs = PreferenciasUsuario();
+                              prefs.userEmail = email;
+                              prefs.ultimaPagina = '/partidos';
+
+                              // Redirigir a la vista de partidos
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      PartidosView(userId: email),
+                                ),
                               );
-                              // Navega a la pantalla principal o realiza otra acción
                             } else {
-                              // Error en el inicio de sesión
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Error al iniciar sesión')),
+                                SnackBar(
+                                    content: Text('Error al iniciar sesión')),
                               );
                             }
                           },
@@ -66,7 +78,6 @@ class LogInPage extends StatelessWidget {
   }
 }
 
-// Widget para la sección del encabezado (título y logo)
 class _HeaderSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -101,7 +112,6 @@ class _HeaderSection extends StatelessWidget {
   }
 }
 
-// Widget para la sección de entrada (campos de texto y botón)
 class _InputSection extends StatelessWidget {
   final TextEditingController emailController;
   final TextEditingController passwordController;
@@ -165,7 +175,6 @@ class _InputSection extends StatelessWidget {
   }
 }
 
-// Widget reutilizable para los campos de texto
 class _InputField extends StatelessWidget {
   final String label;
   final bool isPassword;

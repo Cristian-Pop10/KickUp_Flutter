@@ -15,6 +15,7 @@ dependencies:
   cloud_firestore: ^5.0.0     # Si usas Firestore, este es el paquete adecuado
   firebase_storage: ^12.4.5   # Si usas almacenamiento en Firebase, este es el paquete adecuado
   firebase_messaging: ^15.2.5
+  shared_preferences: ^2.0.15
 
   cupertino_icons: ^1.0.2
 
@@ -35,3 +36,4 @@ flutter:
   assets:
     - assets/logo.png
     - assets/arbitro.png
+    - assets/profile.jpg
