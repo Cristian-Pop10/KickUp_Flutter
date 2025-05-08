@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_application/src/preferences/pref_usuarios.dart';
 import 'package:flutter_application/src/vista/detalle_partido_view.dart';
+import 'package:flutter_application/src/vista/equipos_view.dart'; // Importar la vista de equipos
 import 'package:flutter_application/src/vista/log_in_screen.dart';
 import 'package:flutter_application/src/vista/partidos_screen.dart';
 import 'package:flutter_application/src/vista/perfil_view.dart';
@@ -88,6 +89,10 @@ class MyApp extends StatelessWidget {
           return MaterialPageRoute(
             builder: (context) => PartidosView(userId: userId),
           );
+        } else if (settings.name == '/equipos') {
+          return MaterialPageRoute(
+            builder: (context) => EquiposView(userId: userId),
+          );
         } else if (settings.name == '/perfil') {
           return MaterialPageRoute(
             builder: (context) => const PerfilView(),
@@ -109,6 +114,7 @@ class MyApp extends StatelessWidget {
       routes: {
         '/login': (context) => LogInPage(),
         '/partidos': (context) => PartidosView(userId: userId),
+        '/equipos': (context) => EquiposView(userId: userId),
         '/perfil': (context) => const PerfilView(),
       },
     );

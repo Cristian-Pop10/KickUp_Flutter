@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_application/src/controlador/auth_controller.dart';
 import 'package:flutter_application/src/controlador/partido_controller.dart';
 import 'package:flutter_application/src/modelo/partido_model.dart';
+import 'package:flutter_application/src/vista/detalle_partido_view.dart';
 
-import 'detalle_partido_view.dart';
 
 class PartidosView extends StatefulWidget {
   final String userId;
@@ -87,7 +87,7 @@ class _PartidosViewState extends State<PartidosView> {
       'Septiembre',
       'Octubre',
       'Noviembre',
-      'Diciembre' 
+      'Diciembre'
     ];
     return meses[mes - 1];
   }
@@ -95,30 +95,22 @@ class _PartidosViewState extends State<PartidosView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFD7EAD9), 
+      backgroundColor: const Color(0xFFD7EAD9),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: const Text(
-          '',
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
       ),
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        color: const Color(0xFFD7EAD9), 
+        color: const Color(0xFFD7EAD9),
         child: Column(
           children: [
             Expanded(
               child: Container(
-                margin: const EdgeInsets.fromLTRB(16, 8, 16, 15), 
+                margin: const EdgeInsets.fromLTRB(16, 0, 16, 20),
                 decoration: BoxDecoration(
-                  color: const Color(
-                      0xFFE5EFE6), 
+                  color: const Color(0xFFE5EFE6),
                   borderRadius: BorderRadius.circular(30),
                 ),
                 child: Column(
@@ -170,15 +162,12 @@ class _PartidosViewState extends State<PartidosView> {
                                   prefixIcon: const Icon(Icons.search,
                                       color: Colors.grey),
                                   border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(
-                                        20), 
+                                    borderRadius: BorderRadius.circular(20),
                                     borderSide:
                                         BorderSide.none, // Sin borde visible
                                   ),
-                                  filled:
-                                      true, 
-                                  fillColor: Colors
-                                      .white, 
+                                  filled: true,
+                                  fillColor: Colors.white,
                                   contentPadding: const EdgeInsets.symmetric(
                                       vertical: 15, horizontal: 20),
                                 ),
@@ -283,7 +272,9 @@ class _PartidosViewState extends State<PartidosView> {
                       icon: Icons.people,
                       label: 'Equipos',
                       isSelected: false,
-                      onTap: () {},
+                      onTap: () {
+                        Navigator.of(context).pushReplacementNamed('/equipos');
+                      },
                     ),
                   ),
                   Expanded(
