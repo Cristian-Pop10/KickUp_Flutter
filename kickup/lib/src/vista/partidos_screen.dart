@@ -3,7 +3,7 @@ import 'package:flutter_application/src/controlador/auth_controller.dart';
 import 'package:flutter_application/src/controlador/partido_controller.dart';
 import 'package:flutter_application/src/modelo/partido_model.dart';
 import 'package:flutter_application/src/vista/detalle_partido_view.dart';
-
+import 'bottom_nav_bar.dart';
 
 class PartidosView extends StatefulWidget {
   final String userId;
@@ -25,6 +25,8 @@ class _PartidosViewState extends State<PartidosView> {
   List<PartidoModel> _partidos = [];
   bool _isLoading = true;
   bool _isSearching = false;
+  final List<Widget> _screens = []; // Aquí puedes definir las pantallas
+  int _currentIndex = 0;
 
   @override
   void initState() {
@@ -92,204 +94,155 @@ class _PartidosViewState extends State<PartidosView> {
     return meses[mes - 1];
   }
 
+  void _onNavBarTap(int index) {
+    setState(() {
+      _currentIndex = index;
+    });
+
+    // Navegar a la pantalla correspondiente
+    switch (index) {
+      case 0:
+        Navigator.of(context).pushReplacementNamed('/partidos');
+        break;
+      case 1:
+        Navigator.of(context).pushReplacementNamed('/equipos');
+        break;
+      case 2:
+        Navigator.of(context).pushReplacementNamed('/pistas');
+        break;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFD7EAD9),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-      ),
+      backgroundColor: const Color(0xFFD7EAD9), // Fondo verde claro
       body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        color: const Color(0xFFD7EAD9),
+        margin: const EdgeInsets.fromLTRB(16, 60, 16, 16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE5EFE6), // Fondo más claro para el contenido
+          borderRadius: BorderRadius.circular(30),
+        ),
         child: Column(
           children: [
-            Expanded(
-              child: Container(
-                margin: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE5EFE6),
-                  borderRadius: BorderRadius.circular(30),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Listado partidos',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: () {
-                              // Usar el AuthController para navegar a la pantalla de perfil
-                              _authController.navigateToPerfil(context);
-                            },
-                            child: const CircleAvatar(
-                              radius: 20,
-                              backgroundImage: AssetImage('assets/profile.jpg'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Container(
-                              height: 50,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFD7D7D7),
-                                borderRadius: BorderRadius.circular(25),
-                              ),
-                              child: TextField(
-                                controller: _searchController,
-                                onChanged: _buscarPartidos,
-                                decoration: InputDecoration(
-                                  hintText: 'Buscar',
-                                  hintStyle:
-                                      const TextStyle(color: Colors.grey),
-                                  prefixIcon: const Icon(Icons.search,
-                                      color: Colors.grey),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(20),
-                                    borderSide:
-                                        BorderSide.none, // Sin borde visible
-                                  ),
-                                  filled: true,
-                                  fillColor: Colors.white,
-                                  contentPadding: const EdgeInsets.symmetric(
-                                      vertical: 15, horizontal: 20),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          ElevatedButton.icon(
-                            onPressed: () {
-                              // Aquí iría la lógica para crear un nuevo partido
-                            },
-                            icon: const Icon(Icons.add, color: Colors.white),
-                            label: const Text(
-                              'crear partido',
-                              style: TextStyle(color: Colors.white),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF5A9A7A),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Expanded(
-                      child: _isLoading
-                          ? const Center(child: CircularProgressIndicator())
-                          : ListView.builder(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 16),
-                              itemCount: _partidos.length,
-                              itemBuilder: (context, index) {
-                                final partido = _partidos[index];
-                                return _PartidoCard(
-                                  fecha: _formatearFecha(partido.fecha),
-                                  tipo: partido.tipo,
-                                  lugar: partido.lugar,
-                                  completo: partido.completo,
-                                  faltantes: partido.jugadoresFaltantes,
-                                  onTap: () {
-                                    // Navegar a la pantalla de detalles del partido
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            DetallePartidoView(
-                                          partidoId: partido.id,
-                                          userId: widget.userId,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                );
-                              },
-                            ),
-                    ),
-                    Container(
-                      margin: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(
-                            0xFFD2C9A0), // Color beige para el botón de calendario
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: ListTile(
-                        leading: const Icon(Icons.calendar_today),
-                        title: const Text(
-                          'CALENDARIO',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
-                          ),
-                        ),
-                        onTap: () {
-                          // Aquí iría la lógica para ver el calendario
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            // Barra de navegación inferior
-            Container(
-              height: 60,
-              padding: const EdgeInsets.only(bottom: 15),
-              color: const Color(
-                  0xFF5A9A7A), // Verde oscuro para la barra de navegación
+            // Espacio en la parte superior
+            const SizedBox(height: 16),
+
+            // Encabezado con el título y el botón de perfil
+            Padding(
+              padding: const EdgeInsets.all(16.0),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded(
-                    child: _NavBarItem(
-                      icon: Icons.sports_soccer,
-                      label: 'Partidos',
-                      isSelected: true,
-                      onTap: () {},
+                  const Text(
+                    'Listado partidos',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  Expanded(
-                    child: _NavBarItem(
-                      icon: Icons.people,
-                      label: 'Equipos',
-                      isSelected: false,
-                      onTap: () {
-                        Navigator.of(context).pushReplacementNamed('/equipos');
-                      },
-                    ),
-                  ),
-                  Expanded(
-                    child: _NavBarItem(
-                      icon: Icons.place,
-                      label: 'Pistas',
-                      isSelected: false,
-                      onTap: () {},
+                  GestureDetector(
+                    onTap: () {
+                      _authController.navigateToPerfil(context);
+                    },
+                    child: const CircleAvatar(
+                      radius: 20,
+                      backgroundImage: AssetImage('assets/profile.jpg'),
                     ),
                   ),
                 ],
               ),
             ),
+
+            // Barra de búsqueda
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD7D7D7),
+                        borderRadius: BorderRadius.circular(25),
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: _buscarPartidos,
+                        decoration: InputDecoration(
+                          hintText: 'Buscar',
+                          hintStyle: const TextStyle(color: Colors.grey),
+                          prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: BorderSide.none,
+                          ),
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding: const EdgeInsets.symmetric(
+                              vertical: 15, horizontal: 20),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      // Lógica para crear un nuevo partido
+                    },
+                    icon: const Icon(Icons.add, color: Colors.white),
+                    label: const Text(
+                      'crear partido',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF5A9A7A),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Lista de partidos
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: _partidos.length,
+                      itemBuilder: (context, index) {
+                        final partido = _partidos[index];
+                        return _PartidoCard(
+                          fecha: _formatearFecha(partido.fecha),
+                          tipo: partido.tipo,
+                          lugar: partido.lugar,
+                          completo: partido.completo,
+                          faltantes: partido.jugadoresFaltantes,
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => DetallePartidoView(
+                                  partidoId: partido.id,
+                                  userId: widget.userId,
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+            ),
           ],
         ),
+      ),
+      bottomNavigationBar: BottomNavBar(
+        currentIndex: _currentIndex,
+        onTap: _onNavBarTap,
       ),
     );
   }
@@ -364,47 +317,6 @@ class _PartidoCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-// Widget para cada ítem de la barra de navegación
-class _NavBarItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _NavBarItem({
-    Key? key,
-    required this.icon,
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            icon,
-            color: Colors.white,
-            size: 24,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-            ),
-          ),
-        ],
       ),
     );
   }
