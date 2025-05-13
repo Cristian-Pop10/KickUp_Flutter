@@ -87,7 +87,7 @@ class MyApp extends StatelessWidget {
         // Extraer argumentos si existen
         final args = settings.arguments;
         final userIdToUse = args is String ? args : userId;
-        
+
         if (settings.name == '/login') {
           return MaterialPageRoute(
             builder: (context) => LogInPage(),

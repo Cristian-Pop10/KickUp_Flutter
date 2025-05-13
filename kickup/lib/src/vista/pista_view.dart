@@ -32,7 +32,7 @@ class _PistasViewState extends State<PistasView> {
   final CameraPosition _initialPosition = const CameraPosition(
     target: LatLng(
         37.4219, -2.2585), // Coordenadas de la zona mostrada en la imagen
-    zoom: 10.0,
+    zoom: 16.0,
   );
 
   @override
