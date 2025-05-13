@@ -35,6 +35,12 @@ class _PerfilViewState extends State<PerfilView> {
 
   @override
   void dispose() {
+    // Guardar cambios automáticamente al salir de la pantalla
+    if (_isEditing) {
+      _guardarCambios();
+    }
+
+    // Liberar los controladores de texto
     _nombreController.dispose();
     _apellidosController.dispose();
     _edadController.dispose();
@@ -42,6 +48,7 @@ class _PerfilViewState extends State<PerfilView> {
     _posicionController.dispose();
     _telefonoController.dispose();
     _emailController.dispose();
+
     super.dispose();
   }
 
@@ -84,19 +91,17 @@ class _PerfilViewState extends State<PerfilView> {
 
     final success = await _perfilController.actualizarPerfil(usuarioActualizado);
 
-    if (success) {
-      setState(() {
-        _usuario = usuarioActualizado;
-        _isEditing = false;
-      });
-      
-      if (mounted) {
+    if (mounted) {
+      if (success) {
+        setState(() {
+          _usuario = usuarioActualizado;
+          _isEditing = false;
+        });
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Perfil actualizado correctamente')),
         );
-      }
-    } else {
-      if (mounted) {
+      } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Error al actualizar el perfil')),
         );

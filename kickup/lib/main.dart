@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_application/src/preferences/pref_usuarios.dart';
+import 'package:flutter_application/src/vista/detalle_equipo_view.dart'; // Importar la vista de detalle de equipo
 import 'package:flutter_application/src/vista/detalle_partido_view.dart';
-import 'package:flutter_application/src/vista/equipos_view.dart'; // Importar la vista de equipos
+import 'package:flutter_application/src/vista/equipos_view.dart';
 import 'package:flutter_application/src/vista/log_in_screen.dart';
 import 'package:flutter_application/src/vista/partidos_screen.dart';
 import 'package:flutter_application/src/vista/perfil_view.dart';
@@ -95,13 +96,21 @@ class MyApp extends StatelessWidget {
           );
         } else if (settings.name == '/perfil') {
           return MaterialPageRoute(
-            builder: (context) => const PerfilView(),
+            builder: (context) => PerfilView(),
           );
         } else if (settings.name!.startsWith('/detalle-partido/')) {
           final partidoId = settings.name!.split('/').last;
           return MaterialPageRoute(
             builder: (context) => DetallePartidoView(
               partidoId: partidoId,
+              userId: userId,
+            ),
+          );
+        } else if (settings.name!.startsWith('/detalle-equipo/')) {
+          final equipoId = settings.name!.split('/').last;
+          return MaterialPageRoute(
+            builder: (context) => DetalleEquipoView(
+              equipoId: equipoId,
               userId: userId,
             ),
           );
@@ -115,7 +124,7 @@ class MyApp extends StatelessWidget {
         '/login': (context) => LogInPage(),
         '/partidos': (context) => PartidosView(userId: userId),
         '/equipos': (context) => EquiposView(userId: userId),
-        '/perfil': (context) => const PerfilView(),
+        '/perfil': (context) => PerfilView(),
       },
     );
   }
