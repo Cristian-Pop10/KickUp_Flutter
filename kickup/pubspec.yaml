@@ -16,6 +16,8 @@ dependencies:
   firebase_storage: ^12.4.5   # Si usas almacenamiento en Firebase, este es el paquete adecuado
   firebase_messaging: ^15.2.5
   shared_preferences: ^2.0.15
+  intl: ^0.18.0
+
 
   cupertino_icons: ^1.0.2
 

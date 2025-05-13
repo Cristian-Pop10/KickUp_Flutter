@@ -3,7 +3,8 @@ import 'package:flutter_application/src/controlador/auth_controller.dart';
 import 'package:flutter_application/src/controlador/partido_controller.dart';
 import 'package:flutter_application/src/modelo/partido_model.dart';
 import 'package:flutter_application/src/vista/detalle_partido_view.dart';
-import 'bottom_nav_bar.dart';
+import 'package:flutter_application/src/vista/crear_partido_view.dart';
+import '../componentes/bottom_nav_bar.dart';
 
 class PartidosView extends StatefulWidget {
   final String userId;
@@ -187,8 +188,17 @@ class _PartidosViewState extends State<PartidosView> {
                   ),
                   const SizedBox(width: 10),
                   ElevatedButton.icon(
-                    onPressed: () {
-                      // Lógica para crear un nuevo partido
+                    onPressed: () async {
+                      final partidoCreado = await Navigator.of(context).push<bool>(
+                        MaterialPageRoute(
+                          builder: (context) => CrearPartidoView(userId: widget.userId),
+                        ),
+                      );
+
+                      // Si se creó un partido, recargar la lista
+                      if (partidoCreado == true) {
+                        _cargarPartidos();
+                      }
                     },
                     icon: const Icon(Icons.add, color: Colors.white),
                     label: const Text(

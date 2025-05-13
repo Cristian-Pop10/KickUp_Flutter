@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../controlador/equipo_controller.dart';
 import '../modelo/equipo_model.dart';
 import 'detalle_equipo_view.dart';
-import 'bottom_nav_bar.dart';
+import '../componentes/bottom_nav_bar.dart';
 
 class EquiposView extends StatefulWidget {
   final String userId;
@@ -113,12 +113,15 @@ class _EquiposViewState extends State<EquiposView> {
                   onChanged: (query) {
                     // Lógica de búsqueda
                   },
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     hintText: 'Buscar',
-                    hintStyle: TextStyle(color: Colors.grey),
-                    prefixIcon: Icon(Icons.search, color: Colors.grey),
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(vertical: 15),
+                    hintStyle: const TextStyle(color: Colors.grey),
+                    prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 15),
                   ),
                 ),
               ),
@@ -132,7 +135,8 @@ class _EquiposViewState extends State<EquiposView> {
                   ? const Center(child: CircularProgressIndicator())
                   : GridView.builder(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 2,
                         childAspectRatio: 0.85,
                         crossAxisSpacing: 16,

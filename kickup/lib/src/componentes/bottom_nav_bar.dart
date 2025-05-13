@@ -1,74 +1,51 @@
 import 'package:flutter/material.dart';
 
-enum NavBarItem {
-  partidos,
-  equipos,
-  pistas,
-}
-
 class BottomNavBar extends StatelessWidget {
-  final NavBarItem selectedItem;
-  final String userId;
+  final int currentIndex;
+  final Function(int) onTap;
 
   const BottomNavBar({
     Key? key,
-    required this.selectedItem,
-    required this.userId,
+    required this.currentIndex,
+    required this.onTap,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Container(
+      margin: const EdgeInsets.only(bottom: 10),
       height: 60,
-      color: const Color(0xFF5A9A7A), // Verde oscuro para la barra de navegación
+      decoration: BoxDecoration(
+        color: const Color(0xFF5A9A7A), 
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(20), 
+          topRight: Radius.circular(20),
+        ),
+      ),
       child: Row(
         children: [
           Expanded(
             child: _NavBarItem(
               icon: Icons.sports_soccer,
               label: 'Partidos',
-              isSelected: selectedItem == NavBarItem.partidos,
-              onTap: () {
-                if (selectedItem != NavBarItem.partidos) {
-                  Navigator.of(context).pushReplacementNamed(
-                    '/partidos',
-                    arguments: userId,
-                  );
-                }
-              },
+              isSelected: currentIndex == 0,
+              onTap: () => onTap(0),
             ),
           ),
           Expanded(
             child: _NavBarItem(
               icon: Icons.people,
               label: 'Equipos',
-              isSelected: selectedItem == NavBarItem.equipos,
-              onTap: () {
-                if (selectedItem != NavBarItem.equipos) {
-                  Navigator.of(context).pushReplacementNamed(
-                    '/equipos',
-                    arguments: userId,
-                  );
-                }
-              },
+              isSelected: currentIndex == 1,
+              onTap: () => onTap(1),
             ),
           ),
           Expanded(
             child: _NavBarItem(
               icon: Icons.place,
               label: 'Pistas',
-              isSelected: selectedItem == NavBarItem.pistas,
-              onTap: () {
-                if (selectedItem != NavBarItem.pistas) {
-                  // Cuando implementes la pantalla de pistas, descomenta esta línea
-                  // Navigator.of(context).pushReplacementNamed('/pistas');
-                  
-                  // Por ahora, solo mostramos un mensaje
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Próximamente: Pistas')),
-                  );
-                }
-              },
+              isSelected: currentIndex == 2,
+              onTap: () => onTap(2),
             ),
           ),
         ],
@@ -77,7 +54,6 @@ class BottomNavBar extends StatelessWidget {
   }
 }
 
-// Widget para cada ítem de la barra de navegación
 class _NavBarItem extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -101,14 +77,14 @@ class _NavBarItem extends StatelessWidget {
         children: [
           Icon(
             icon,
-            color: Colors.white,
+            color: isSelected ? Colors.white : Colors.white70,
             size: 24,
           ),
           const SizedBox(height: 4),
           Text(
             label,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: isSelected ? Colors.white : Colors.white70,
               fontSize: 12,
             ),
           ),

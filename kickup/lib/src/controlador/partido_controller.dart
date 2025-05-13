@@ -1,31 +1,64 @@
-import 'package:flutter_application/src/modelo/partido_model.dart';
-import 'package:flutter_application/src/modelo/user_model.dart';
-
+import '../modelo/partido_model.dart';
+import '../modelo/user_model.dart';
+import 'dart:async';
 
 class PartidoController {
+  // Lista para almacenar los partidos (simulando una base de datos)
+  static final List<PartidoModel> _partidos = [];
+  
+  // Stream controller para notificar cambios en la lista de partidos
+  static final _partidosStreamController = StreamController<List<PartidoModel>>.broadcast();
+  
+  // Stream para escuchar cambios en la lista de partidos
+  Stream<List<PartidoModel>> get partidosStream => _partidosStreamController.stream;
+
+  // Constructor
+  PartidoController() {
+    // Si la lista está vacía, inicializarla con datos de ejemplo
+    if (_partidos.isEmpty) {
+      _partidos.addAll(_generarPartidosEjemplo());
+      _partidosStreamController.add(_partidos);
+    }
+  }
+
   // Método para obtener todos los partidos
   Future<List<PartidoModel>> obtenerPartidos() async {
     // Aquí se conectaría con un servicio o API para obtener los partidos
-    // Por ahora, devolvemos datos de ejemplo
+    // Por ahora, devolvemos los partidos almacenados
     await Future.delayed(const Duration(seconds: 1)); // Simular carga
     
-    return _generarPartidosEjemplo();
+    return _partidos;
+  }
+
+  // Método para crear un nuevo partido
+  Future<bool> crearPartido(PartidoModel partido) async {
+    try {
+      // Aquí se conectaría con un servicio o API para crear el partido
+      // Por ahora, lo añadimos a la lista local
+      await Future.delayed(const Duration(seconds: 1)); // Simular carga
+      
+      _partidos.add(partido);
+      _partidosStreamController.add(_partidos); // Notificar cambios
+      
+      return true;
+    } catch (e) {
+      print('Error al crear partido: $e');
+      return false;
+    }
   }
 
   // Método para buscar partidos por texto
   Future<List<PartidoModel>> buscarPartidos(String query) async {
     // Aquí se conectaría con un servicio o API para buscar partidos
-    // Por ahora, filtramos los datos de ejemplo
+    // Por ahora, filtramos los datos almacenados
     await Future.delayed(const Duration(milliseconds: 500)); // Simular carga
     
-    final partidos = _generarPartidosEjemplo();
-    
     if (query.isEmpty) {
-      return partidos;
+      return _partidos;
     }
     
     final queryLower = query.toLowerCase();
-    return partidos.where((partido) {
+    return _partidos.where((partido) {
       return partido.tipo.toLowerCase().contains(queryLower) ||
              partido.lugar.toLowerCase().contains(queryLower);
     }).toList();
@@ -34,14 +67,17 @@ class PartidoController {
   // Método para obtener un partido por su ID
   Future<PartidoModel?> obtenerPartidoPorId(String partidoId) async {
     // Aquí se conectaría con un servicio o API para obtener el partido
-    // Por ahora, buscamos en los datos de ejemplo
+    // Por ahora, buscamos en los datos almacenados
     await Future.delayed(const Duration(seconds: 1)); // Simular carga
     
-    final partidos = _generarPartidosEjemplo();
-    return partidos.firstWhere(
-      (partido) => partido.id == partidoId,
-      orElse: () => throw Exception('Partido no encontrado'),
-    );
+    try {
+      return _partidos.firstWhere(
+        (partido) => partido.id == partidoId,
+      );
+    } catch (e) {
+      print('Error al obtener partido: $e');
+      return null;
+    }
   }
 
   // Método para verificar si un usuario está inscrito en un partido
@@ -50,8 +86,15 @@ class PartidoController {
     // Por ahora, simulamos la verificación
     await Future.delayed(const Duration(milliseconds: 500)); // Simular carga
     
-    // Simulamos que el usuario está inscrito si su ID termina en "1"
-    return userId.endsWith('1');
+    try {
+      final partido = await obtenerPartidoPorId(partidoId);
+      if (partido == null) return false;
+      
+      return partido.jugadores.any((jugador) => jugador.id == userId);
+    } catch (e) {
+      print('Error al verificar inscripción: $e');
+      return false;
+    }
   }
 
   // Método para inscribirse a un partido
@@ -60,7 +103,39 @@ class PartidoController {
     // Por ahora, simulamos una inscripción exitosa
     await Future.delayed(const Duration(seconds: 1)); // Simular carga
     
-    return true; // Simulamos éxito
+    try {
+      final partidoIndex = _partidos.indexWhere((p) => p.id == partidoId);
+      if (partidoIndex == -1) return false;
+      
+      final partido = _partidos[partidoIndex];
+      
+      // Verificar si ya está inscrito
+      if (partido.jugadores.any((j) => j.id == userId)) return true;
+      
+      // Crear un usuario simulado
+      final nuevoJugador = UserModel(
+        id: userId,
+        email: 'usuario$userId@example.com',
+        nombre: 'Usuario $userId',
+      );
+      
+      // Crear una copia del partido con el nuevo jugador
+      final nuevosJugadores = List<UserModel>.from(partido.jugadores)..add(nuevoJugador);
+      final nuevoPartido = partido.copyWith(
+        jugadores: nuevosJugadores,
+        jugadoresFaltantes: partido.jugadoresFaltantes - 1,
+        completo: partido.jugadoresFaltantes <= 1,
+      );
+      
+      // Actualizar el partido en la lista
+      _partidos[partidoIndex] = nuevoPartido;
+      _partidosStreamController.add(_partidos); // Notificar cambios
+      
+      return true;
+    } catch (e) {
+      print('Error al inscribirse al partido: $e');
+      return false;
+    }
   }
 
   // Método para abandonar un partido
@@ -69,7 +144,32 @@ class PartidoController {
     // Por ahora, simulamos un abandono exitoso
     await Future.delayed(const Duration(seconds: 1)); // Simular carga
     
-    return true; // Simulamos éxito
+    try {
+      final partidoIndex = _partidos.indexWhere((p) => p.id == partidoId);
+      if (partidoIndex == -1) return false;
+      
+      final partido = _partidos[partidoIndex];
+      
+      // Verificar si está inscrito
+      if (!partido.jugadores.any((j) => j.id == userId)) return true;
+      
+      // Crear una copia del partido sin el jugador
+      final nuevosJugadores = partido.jugadores.where((j) => j.id != userId).toList();
+      final nuevoPartido = partido.copyWith(
+        jugadores: nuevosJugadores,
+        jugadoresFaltantes: partido.jugadoresFaltantes + 1,
+        completo: false,
+      );
+      
+      // Actualizar el partido en la lista
+      _partidos[partidoIndex] = nuevoPartido;
+      _partidosStreamController.add(_partidos); // Notificar cambios
+      
+      return true;
+    } catch (e) {
+      print('Error al abandonar el partido: $e');
+      return false;
+    }
   }
 
   // Método para generar datos de ejemplo
@@ -143,5 +243,10 @@ class PartidoController {
         jugadores: [usuarios[2]],
       ),
     ];
+  }
+  
+  // Método para cerrar el stream controller
+  void dispose() {
+    _partidosStreamController.close();
   }
 }
