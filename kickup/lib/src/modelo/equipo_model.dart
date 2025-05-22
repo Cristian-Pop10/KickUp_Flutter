@@ -1,11 +1,11 @@
 class EquipoModel {
   final String id;
   final String nombre;
-  final String tipo; // Fútbol Sala, Fútbol 7, Fútbol 11
+  final String tipo;
   final String logoUrl;
   final String? descripcion;
   final List<String> jugadoresIds;
-  final String? creadorId;
+  final int nivel;
 
   EquipoModel({
     required this.id,
@@ -14,7 +14,7 @@ class EquipoModel {
     required this.logoUrl,
     this.descripcion,
     required this.jugadoresIds,
-    this.creadorId,
+    this.nivel = 1,
   });
 
   // Constructor de copia con parámetros opcionales
@@ -25,7 +25,7 @@ class EquipoModel {
     String? logoUrl,
     String? descripcion,
     List<String>? jugadoresIds,
-    String? creadorId,
+    int? nivel,
   }) {
     return EquipoModel(
       id: id ?? this.id,
@@ -34,7 +34,7 @@ class EquipoModel {
       logoUrl: logoUrl ?? this.logoUrl,
       descripcion: descripcion ?? this.descripcion,
       jugadoresIds: jugadoresIds ?? this.jugadoresIds,
-      creadorId: creadorId ?? this.creadorId,
+      nivel: nivel ?? this.nivel,
     );
   }
 
@@ -47,7 +47,7 @@ class EquipoModel {
       logoUrl: json['logoUrl'],
       descripcion: json['descripcion'],
       jugadoresIds: List<String>.from(json['jugadoresIds'] ?? []),
-      creadorId: json['creadorId'],
+      nivel: json['nivel'] ?? 1,
     );
   }
 
@@ -60,7 +60,7 @@ class EquipoModel {
       'logoUrl': logoUrl,
       'descripcion': descripcion,
       'jugadoresIds': jugadoresIds,
-      'creadorId': creadorId,
+      'nivel': nivel,
     };
   }
 }

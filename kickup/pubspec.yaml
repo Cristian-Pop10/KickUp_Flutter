@@ -9,15 +9,18 @@ dependencies:
   flutter:
     sdk: flutter
   
-  firebase_core: ^3.13.0   # Actualiza firebase_core a la versión compatible
-  firebase_auth: ^5.5.2       # Utiliza la versión más reciente de firebase_auth compatible con el Firebase BoM
-  firebase_analytics: ^11.4.5  # Asegúrate de que la versión de firebase_analytics sea compatible con firebase_core
-  cloud_firestore: ^5.0.0     # Si usas Firestore, este es el paquete adecuado
-  firebase_storage: ^12.4.5   # Si usas almacenamiento en Firebase, este es el paquete adecuado
-  firebase_messaging: ^15.2.5
+  firebase_core: ^3.13.1
+  firebase_auth: ^5.5.4
+  firebase_analytics: ^11.4.6
+  cloud_firestore: ^5.6.8
+  firebase_storage: ^12.4.6
+  firebase_messaging: ^15.2.6
   shared_preferences: ^2.0.15
-  intl: ^0.18.0
-  google_maps_flutter: ^2.2.5
+  intl: ^0.20.2
+  image_picker: ^1.0.4
+  google_maps_flutter: ^2.5.0
+  location: ^8.0.0
+  permission_handler: ^12.0.0+1
 
 
 

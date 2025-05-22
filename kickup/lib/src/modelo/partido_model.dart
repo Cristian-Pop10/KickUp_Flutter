@@ -1,6 +1,5 @@
 import 'package:flutter_application/src/modelo/user_model.dart';
 
-
 class PartidoModel {
   final String id;
   final DateTime fecha;
@@ -56,18 +55,18 @@ class PartidoModel {
   // Método para crear un PartidoModel desde un Map (por ejemplo, desde JSON)
   factory PartidoModel.fromJson(Map<String, dynamic> json) {
     return PartidoModel(
-      id: json['id'],
-      fecha: DateTime.parse(json['fecha']),
-      tipo: json['tipo'],
-      lugar: json['lugar'],
-      completo: json['completo'],
-      jugadoresFaltantes: json['jugadoresFaltantes'],
-      precio: json['precio'].toDouble(),
-      duracion: json['duracion'],
+      id: json['id'] ?? '',
+      fecha: json['fecha'] != null ? DateTime.parse(json['fecha']) : DateTime.now(),
+      tipo: json['tipo'] ?? '',
+      lugar: json['lugar'] ?? '',
+      completo: json['completo'] ?? false,
+      jugadoresFaltantes: json['jugadoresFaltantes'] ?? 0,
+      precio: (json['precio'] != null) ? (json['precio'] as num).toDouble() : 0.0,
+      duracion: json['duracion'] ?? 0,
       descripcion: json['descripcion'],
-      jugadores: (json['jugadores'] as List)
-          .map((jugador) => UserModel.fromJson(jugador))
-          .toList(),
+      jugadores: (json['jugadores'] as List?)
+          ?.map((jugador) => UserModel.fromJson(jugador))
+          .toList() ?? [],
     );
   }
 

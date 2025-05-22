@@ -1,35 +1,53 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_application/src/vista/partidos_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../modelo/signup_model.dart';
 import '../modelo/user_model.dart';
 import '../servicio/auth_service.dart';
-import '../vista/partidos_screen.dart';
-import '../vista/perfil_view.dart'; // Importar la vista de perfil
+import '../vista/perfil_view.dart';
 
 class AuthController {
   final AuthService _authService = AuthService();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   Future<bool> register(SignupModel signupModel) async {
-    return await _authService.register(UserModel(
-      email: signupModel.email,
-      password: signupModel.password,
-    ));
+    try {
+      return await _authService.register(UserModel(
+        email: signupModel.email,
+        password: signupModel.password,
+      ));
+    } catch (e) {
+      print('Error en el registro: $e');
+      return false;
+    }
   }
 
   Future<bool> login(String email, String password) async {
-    return await _authService.login(email, password);
+    try {
+      return await _authService.login(email, password);
+    } catch (e) {
+      print('Error en el login: $e');
+      return false;
+    }
   }
 
   Future<void> logout(BuildContext context) async {
-    await _authService.logout();
+    try {
+      await _authService.logout();
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('is_logged_in');
-    await prefs.remove('user_id');
-
-    // Navegar de vuelta a la pantalla de login
-    if (context.mounted) {
-      Navigator.of(context).pushReplacementNamed('/login');
+      // Navegar de vuelta a la pantalla de login
+      if (context.mounted) {
+        Navigator.of(context).pushReplacementNamed('/login');
+      }
+    } catch (e) {
+      print('Error en el logout: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al cerrar sesión: ${e.toString()}')),
+        );
+      }
     }
   }
 
@@ -40,18 +58,19 @@ class AuthController {
       final success = await login(email, password);
 
       if (success && context.mounted) {
-        // Login exitoso, navegar a la pantalla de partidos
-        // Guardar sesión
+        // Obtener el ID del usuario después de un login exitoso
+        final user = FirebaseAuth.instance.currentUser;
+        final userId = user?.uid ?? '';
+        
+        // Guardar el ID del usuario en SharedPreferences
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('is_logged_in', true);
-
-        // Guardar el ID del usuario después de un login exitoso
-        final userId = 'user_1'; // Este valor debe provenir del backend o Firebase
         await prefs.setString('user_id', userId);
         print('✅ Sesión guardada con ID de usuario: $userId');
 
         // Navegar a la pantalla de Partidos
-        navigateToPartidos(context, userId);
+        if (context.mounted) {
+          navigateToPartidos(context, userId);
+        }
       } else if (context.mounted) {
         // Login fallido, mostrar mensaje de error
         ScaffoldMessenger.of(context).showSnackBar(
@@ -71,30 +90,29 @@ class AuthController {
   void navigateToPartidos(BuildContext context, String userId) {
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (context) => PartidosView(userId: userId), // Ahora usa el userId real
+        builder: (context) => PartidosView(userId: userId),
       ),
     );
   }
 
   // Método para navegar a la pantalla de perfil
   void navigateToPerfil(BuildContext context) {
+    final userId = _authService.getCurrentUserId() ?? '';
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => const PerfilView(),
+        builder: (context) => PerfilView(userId: userId),
       ),
     );
   }
 
   // Método para verificar si el usuario está autenticado
   Future<bool> isAuthenticated() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool('is_logged_in') ?? false;
+    return await _authService.isUserLoggedIn();
   }
 
   // Método para obtener el ID del usuario actual
   Future<String?> getCurrentUserId() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('user_id');
+    return _authService.getCurrentUserId();
   }
 
   // Validaciones de email y password
@@ -116,5 +134,34 @@ class AuthController {
       return 'La contraseña debe tener al menos 6 caracteres';
     }
     return null;
+  }
+
+  /// Registra un usuario con todos los campos en Firebase Auth y Firestore
+  Future<bool> registerWithUser(UserModel user) async {
+    try {
+      // 1. Registrar en Firebase Auth
+      final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: user.email,
+        password: user.password ?? '',
+      );
+
+      // 2. Guardar datos adicionales en Firestore
+      final userWithId = user.copyWith(id: credential.user?.uid);
+      await _firestore
+          .collection('usuarios')
+          .doc(credential.user?.uid)
+          .set(userWithId.toJson());
+
+      // 3. Guardar información en SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_email', user.email);
+      await prefs.setString('user_id', credential.user?.uid ?? '');
+      await prefs.setBool('is_logged_in', true);
+
+      return true;
+    } catch (e) {
+      print('Error en el registro: $e');
+      return false;
+    }
   }
 }

@@ -6,12 +6,12 @@ class UserService {
 
   // Guardar un usuario en Firestore
   Future<void> saveUser(UserModel user) async {
-    await _firestore.collection('users').doc(user.id).set(user.toJson());
+    await _firestore.collection('usuarios').doc(user.id).set(user.toJson());
   }
 
   // Obtener un usuario desde Firestore
   Future<UserModel?> getUser(String userId) async {
-    final doc = await _firestore.collection('users').doc(userId).get();
+    final doc = await _firestore.collection('usuarios').doc(userId).get();
     if (doc.exists) {
       return UserModel.fromJson(doc.data()!);
     }

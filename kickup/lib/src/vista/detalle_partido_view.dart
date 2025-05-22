@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application/src/controlador/partido_controller.dart';
 import 'package:flutter_application/src/modelo/partido_model.dart';
-
+import 'package:flutter_application/src/servicio/user_service.dart';
 
 class DetallePartidoView extends StatefulWidget {
   final String partidoId;
@@ -19,6 +19,7 @@ class DetallePartidoView extends StatefulWidget {
 
 class _DetallePartidoViewState extends State<DetallePartidoView> {
   final PartidoController _partidoController = PartidoController();
+  final UserService _userService = UserService();
   PartidoModel? _partido;
   bool _isLoading = true;
   bool _usuarioInscrito = false;
@@ -35,8 +36,10 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
     });
 
     try {
-      final partido = await _partidoController.obtenerPartidoPorId(widget.partidoId);
-      final inscrito = await _partidoController.verificarInscripcion(widget.partidoId, widget.userId);
+      final partido =
+          await _partidoController.obtenerPartidoPorId(widget.partidoId);
+      final inscrito = await _partidoController.verificarInscripcion(
+          widget.partidoId, widget.userId);
 
       setState(() {
         _partido = partido;
@@ -49,7 +52,8 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al cargar el partido: ${e.toString()}')),
+          SnackBar(
+              content: Text('Error al cargar el partido: ${e.toString()}')),
         );
       }
     }
@@ -61,7 +65,22 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
     });
 
     try {
-      final success = await _partidoController.inscribirsePartido(widget.partidoId, widget.userId);
+      // Obtén el usuario completo desde Firestore
+      final user = await _userService.getUser(widget.userId);
+      if (user == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No se pudo obtener el usuario')),
+          );
+        }
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final success =
+          await _partidoController.inscribirsePartido(widget.partidoId, user);
 
       if (success) {
         setState(() {
@@ -75,7 +94,8 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Te has inscrito al partido correctamente')),
+            const SnackBar(
+                content: Text('Te has inscrito al partido correctamente')),
           );
         }
       } else {
@@ -104,7 +124,8 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Abandonar partido'),
-        content: const Text('¿Estás seguro de que quieres abandonar este partido?'),
+        content:
+            const Text('¿Estás seguro de que quieres abandonar este partido?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -125,7 +146,8 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
     });
 
     try {
-      final success = await _partidoController.abandonarPartido(widget.partidoId, widget.userId);
+      final success = await _partidoController.abandonarPartido(
+          widget.partidoId, widget.userId);
 
       if (success) {
         setState(() {
@@ -139,7 +161,8 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Has abandonado el partido correctamente')),
+            const SnackBar(
+                content: Text('Has abandonado el partido correctamente')),
           );
         }
       } else {
@@ -168,14 +191,24 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
     final anio = fecha.year;
     final hora = fecha.hour.toString().padLeft(2, '0');
     final minuto = fecha.minute.toString().padLeft(2, '0');
-    
+
     return '$dia de $mes, $anio - $hora:$minuto';
   }
 
   String _obtenerNombreMes(int mes) {
     const meses = [
-      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+      'Enero',
+      'Febrero',
+      'Marzo',
+      'Abril',
+      'Mayo',
+      'Junio',
+      'Julio',
+      'Agosto',
+      'Septiembre',
+      'Octubre',
+      'Noviembre',
+      'Diciembre'
     ];
     return meses[mes - 1];
   }
@@ -207,7 +240,8 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
                   child: Container(
                     margin: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE5EFE6), // Fondo más claro para el contenido
+                      color: const Color(
+                          0xFFE5EFE6), // Fondo más claro para el contenido
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Column(
@@ -217,7 +251,8 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
                         Container(
                           padding: const EdgeInsets.all(16),
                           decoration: const BoxDecoration(
-                            color: Color(0xFFD2C9A0), // Color beige para el encabezado
+                            color: Color(
+                                0xFFD2C9A0), // Color beige para el encabezado
                             borderRadius: BorderRadius.only(
                               topLeft: Radius.circular(20),
                               topRight: Radius.circular(20),
@@ -255,7 +290,7 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
                             ],
                           ),
                         ),
-                        
+
                         // Información del partido
                         Padding(
                           padding: const EdgeInsets.all(16),
@@ -286,34 +321,34 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
                                   ),
                                 ),
                               ),
-                              
+
                               const SizedBox(height: 24),
-                              
+
                               // Detalles del partido
                               _buildInfoSection(
                                 'Ubicación',
                                 _partido!.lugar,
                                 Icons.location_on,
                               ),
-                              
+
                               const SizedBox(height: 16),
-                              
+
                               _buildInfoSection(
                                 'Precio',
                                 '${_partido!.precio}€ por persona',
                                 Icons.euro,
                               ),
-                              
+
                               const SizedBox(height: 16),
-                              
+
                               _buildInfoSection(
                                 'Duración',
                                 '${_partido!.duracion} minutos',
                                 Icons.timer,
                               ),
-                              
+
                               const SizedBox(height: 24),
-                              
+
                               // Lista de jugadores
                               const Text(
                                 'Jugadores inscritos',
@@ -322,9 +357,9 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              
+
                               const SizedBox(height: 16),
-                              
+
                               // Lista de jugadores (simulada)
                               ListView.builder(
                                 shrinkWrap: true,
@@ -334,7 +369,9 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
                                   final jugador = _partido!.jugadores[index];
                                   return ListTile(
                                     leading: CircleAvatar(
-                                      backgroundImage: AssetImage(jugador.profileImageUrl ?? 'assets/profile.jpg'),
+                                      backgroundImage: AssetImage(
+                                          jugador.profileImageUrl ??
+                                              'assets/profile.jpg'),
                                     ),
                                     title: Text(
                                       '${jugador.nombre} ${jugador.apellidos}',
@@ -348,34 +385,15 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
                                   );
                                 },
                               ),
-                              
+
                               const SizedBox(height: 24),
-                              
-                              // Descripción del partido
-                              const Text(
-                                'Descripción',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              
-                              const SizedBox(height: 8),
-                              
-                              Text(
-                                _partido!.descripcion ?? 'Sin descripción',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                ),
-                              ),
-                              
-                              const SizedBox(height: 32),
-                              
+
                               // Botón para inscribirse o abandonar
                               SizedBox(
                                 width: double.infinity,
                                 child: ElevatedButton(
-                                  onPressed: _partido!.completo && !_usuarioInscrito
+                                  onPressed: _partido!.completo &&
+                                          !_usuarioInscrito
                                       ? null // Desactivar si está completo y el usuario no está inscrito
                                       : _usuarioInscrito
                                           ? _abandonarPartido
@@ -385,7 +403,8 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
                                         ? Colors.red
                                         : const Color(0xFF5A9A7A),
                                     foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 16),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(30),
                                     ),
@@ -402,7 +421,7 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
                                   ),
                                 ),
                               ),
-                              
+
                               const SizedBox(height: 16),
                             ],
                           ),

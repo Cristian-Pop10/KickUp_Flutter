@@ -1,17 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'package:flutter_application/src/preferences/pref_usuarios.dart';
 import 'package:flutter_application/src/vista/detalle_equipo_view.dart';
 import 'package:flutter_application/src/vista/detalle_partido_view.dart';
 import 'package:flutter_application/src/vista/detalle_pista_view.dart';
 import 'package:flutter_application/src/vista/equipos_view.dart';
-import 'package:flutter_application/src/vista/log_in_screen.dart';
-import 'package:flutter_application/src/vista/partidos_screen.dart';
+import 'package:flutter_application/src/vista/log_in_view.dart';
+import 'package:flutter_application/src/vista/partidos_view.dart';
 import 'package:flutter_application/src/vista/perfil_view.dart';
 import 'package:flutter_application/src/vista/pista_view.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Inicializar Firebase con las opciones específicas de la plataforma
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  
   await PreferenciasUsuario.init();
 
   SystemChrome.setPreferredOrientations([
@@ -21,7 +29,7 @@ void main() async {
 
   final storedUserId = PreferenciasUsuario.userId;
   final isAuthenticated = storedUserId.isNotEmpty;
-  final userId = storedUserId.isNotEmpty ? storedUserId : 'user_1';
+  final userId = storedUserId.isNotEmpty ? storedUserId : 'user_id';
 
   runApp(MyApp(
     isAuthenticated: isAuthenticated,
@@ -106,7 +114,7 @@ class MyApp extends StatelessWidget {
           );
         } else if (settings.name == '/perfil') {
           return MaterialPageRoute(
-            builder: (context) => const PerfilView(),
+            builder: (context) => PerfilView(userId: userIdToUse), 
           );
         } else if (settings.name!.startsWith('/detalle-partido/')) {
           final partidoId = settings.name!.split('/').last;

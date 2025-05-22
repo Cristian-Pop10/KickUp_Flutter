@@ -26,11 +26,22 @@ class _CrearPartidoViewState extends State<CrearPartidoView> {
   final TextEditingController _fechaController = TextEditingController();
   final TextEditingController _horaController = TextEditingController();
   final TextEditingController _ubicacionController = TextEditingController();
-
+  final TextEditingController _precioController = TextEditingController(text: '1.0'); 
   // Variables para almacenar los valores seleccionados
   DateTime? _fechaSeleccionada;
   TimeOfDay? _horaSeleccionada;
   bool _isLoading = false;
+
+  // Nuevo: lista y valor seleccionado para tipo de partido
+  final List<String> _tiposPartido = ['Fútbol Sala', 'Fútbol 7', 'Fútbol 11'];
+  String _tipoSeleccionado = 'Fútbol Sala';
+
+  // Nuevo: mapa con el número máximo de integrantes por tipo de partido
+  final Map<String, int> maxIntegrantesPorTipo = {
+    'Fútbol Sala': 10,
+    'Fútbol 7': 14,
+    'Fútbol 11': 22,
+  };
 
   @override
   void dispose() {
@@ -39,6 +50,7 @@ class _CrearPartidoViewState extends State<CrearPartidoView> {
     _fechaController.dispose();
     _horaController.dispose();
     _ubicacionController.dispose();
+    _precioController.dispose();
     super.dispose();
   }
 
@@ -115,44 +127,35 @@ class _CrearPartidoViewState extends State<CrearPartidoView> {
           _horaSeleccionada!.minute,
         );
 
-        // Determinar el tipo de partido basado en el número de integrantes
         final int integrantes = int.tryParse(_integrantesController.text) ?? 0;
-        String tipo = 'Fútbol Sala';
-        if (integrantes > 10) {
-          tipo = 'Fútbol 11';
-        } else if (integrantes > 5) {
-          tipo = 'Fútbol 7';
-        }
+        final double precio = double.tryParse(_precioController.text) ?? 5.0;
 
         // Crear el modelo de partido
         final nuevoPartido = PartidoModel(
           id: 'partido_${DateTime.now().millisecondsSinceEpoch}',
           fecha: fechaHora,
-          tipo: tipo,
+          tipo: _tipoSeleccionado, 
           lugar: _ubicacionController.text,
           completo: false,
-          jugadoresFaltantes: integrantes - 1, // Restar el creador
-          precio: 5.0, // Valor por defecto
-          duracion: 90, // Duración por defecto en minutos
-          descripcion: 'Partido organizado por ${_nombreController.text}',
+          jugadoresFaltantes: integrantes - 1,
+          precio: precio, 
+          duracion: 90,
           jugadores: [
             UserModel(
               id: widget.userId,
-              email: 'usuario@example.com', // Valor por defecto
-              nombre: 'Usuario Actual', // Valor por defecto
+              email: 'usuario@example.com',
+              nombre: 'Usuario Actual',
             ),
           ],
         );
 
-        // Guardar el partido
         final resultado = await _partidoController.crearPartido(nuevoPartido);
 
         if (resultado && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Partido creado correctamente')),
           );
-          Navigator.pop(context,
-              true); // Volver a la pantalla anterior con resultado positivo
+          Navigator.pop(context, true);
         } else if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Error al crear el partido')),
@@ -177,7 +180,7 @@ class _CrearPartidoViewState extends State<CrearPartidoView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFE5EFE6), // Fondo verde claro
+      backgroundColor: const Color(0xFFE5EFE6),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -215,6 +218,68 @@ class _CrearPartidoViewState extends State<CrearPartidoView> {
                         ),
                       ),
                       const SizedBox(height: 30),
+
+                      // Campo Tipo de Partido
+                      const Text(
+                        'Tipo de Partido',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<String>(
+                        value: _tipoSeleccionado,
+                        items: _tiposPartido
+                            .map((tipo) => DropdownMenuItem(
+                                  value: tipo,
+                                  child: Text(tipo),
+                                ))
+                            .toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            _tipoSeleccionado = value!;
+                          });
+                        },
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: const Color(0xFFE8DDBD),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(15),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Campo Precio
+                      const Text(
+                        'Precio (€)',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildTextField(
+                        controller: _precioController,
+                        hintText: 'Precio por persona',
+                        keyboardType: TextInputType.numberWithOptions(decimal: true),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Por favor ingresa el precio';
+                          }
+                          final precio = double.tryParse(value);
+                          if (precio == null || precio < 0) {
+                            return 'El precio debe ser un número positivo';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 20),
 
                       // Campo Nombre
                       const Text(
@@ -257,8 +322,12 @@ class _CrearPartidoViewState extends State<CrearPartidoView> {
                             return 'Por favor ingresa el número de integrantes';
                           }
                           final integrantes = int.tryParse(value);
+                          final maxIntegrantes = maxIntegrantesPorTipo[_tipoSeleccionado] ?? 22;
                           if (integrantes == null || integrantes < 2) {
                             return 'Debe haber al menos 2 integrantes';
+                          }
+                          if (integrantes > maxIntegrantes) {
+                            return 'Máximo para $_tipoSeleccionado: $maxIntegrantes';
                           }
                           return null;
                         },

@@ -1,33 +1,67 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../modelo/pista_model.dart';
 
 class PistaController {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
   // Método para obtener todas las pistas
   Future<List<PistaModel>> obtenerPistas() async {
     try {
-      // En una aplicación real, aquí obtendrías los datos de las pistas desde Firebase o tu backend
-      // Por ahora, simulamos datos de ejemplo
-      await Future.delayed(const Duration(seconds: 1)); // Simular carga
+      // Intentar obtener pistas desde Firestore
+      final querySnapshot = await _firestore.collection('pistas').get();
       
-      return _generarPistasEjemplo();
+      // Si hay pistas en Firestore, devolverlas
+      if (querySnapshot.docs.isNotEmpty) {
+        return querySnapshot.docs
+            .map((doc) => PistaModel.fromJson(doc.data()))
+            .toList();
+      }
+      
+      // Si no hay pistas en Firestore, crear algunas de ejemplo y guardarlas
+      final pistasEjemplo = _generarPistasEjemplo();
+      
+      // Guardar las pistas de ejemplo en Firestore
+      for (final pista in pistasEjemplo) {
+        await _firestore.collection('pistas').doc(pista.id).set(pista.toJson());
+      }
+      
+      return pistasEjemplo;
     } catch (e) {
       print('Error al obtener pistas: $e');
-      return [];
+      
+      // En caso de error, devolver pistas de ejemplo sin guardarlas
+      return _generarPistasEjemplo();
     }
   }
 
   // Método para buscar pistas por texto
   Future<List<PistaModel>> buscarPistas(String query) async {
     try {
-      // En una aplicación real, aquí buscarías las pistas en Firebase o tu backend
-      // Por ahora, filtramos los datos de ejemplo
-      await Future.delayed(const Duration(milliseconds: 500)); // Simular carga
+      // Obtener todas las pistas
+      List<PistaModel> pistas;
       
-      final pistas = _generarPistasEjemplo();
+      try {
+        // Intentar obtener pistas desde Firestore
+        final querySnapshot = await _firestore.collection('pistas').get();
+        
+        if (querySnapshot.docs.isNotEmpty) {
+          pistas = querySnapshot.docs
+              .map((doc) => PistaModel.fromJson(doc.data()))
+              .toList();
+        } else {
+          pistas = _generarPistasEjemplo();
+        }
+      } catch (e) {
+        // En caso de error, usar pistas de ejemplo
+        pistas = _generarPistasEjemplo();
+      }
       
+      // Si la consulta está vacía, devolver todas las pistas
       if (query.isEmpty) {
         return pistas;
       }
       
+      // Filtrar las pistas según la consulta
       final queryLower = query.toLowerCase();
       return pistas.where((pista) {
         return pista.nombre.toLowerCase().contains(queryLower) ||
@@ -43,18 +77,57 @@ class PistaController {
   // Método para obtener una pista por su ID
   Future<PistaModel?> obtenerPistaPorId(String pistaId) async {
     try {
-      // En una aplicación real, aquí obtendrías la pista desde Firebase o tu backend
-      // Por ahora, buscamos en los datos de ejemplo
-      await Future.delayed(const Duration(milliseconds: 500)); // Simular carga
+      // Intentar obtener la pista desde Firestore
+      final doc = await _firestore.collection('pistas').doc(pistaId).get();
       
-      final pistas = _generarPistasEjemplo();
-      return pistas.firstWhere(
+      if (doc.exists) {
+        return PistaModel.fromJson(doc.data()!);
+      }
+      
+      // Si no existe en Firestore, buscar en las pistas de ejemplo
+      final pistasEjemplo = _generarPistasEjemplo();
+      return pistasEjemplo.firstWhere(
         (pista) => pista.id == pistaId,
         orElse: () => throw Exception('Pista no encontrada'),
       );
     } catch (e) {
       print('Error al obtener pista: $e');
       return null;
+    }
+  }
+
+  // Método para crear una nueva pista
+  Future<bool> crearPista(PistaModel pista) async {
+    try {
+      // Si no tiene ID, generar uno
+      final id = pista.id.isEmpty ? 'pista_${DateTime.now().millisecondsSinceEpoch}' : pista.id;
+      final pistaConId = pista.copyWith(id: id);
+      
+      // Guardar la pista en Firestore
+      await _firestore.collection('pistas').doc(id).set(pistaConId.toJson());
+      
+      return true;
+    } catch (e) {
+      print('Error al crear pista: $e');
+      return false;
+    }
+  }
+
+  // Método para actualizar una pista
+  Future<bool> actualizarPista(PistaModel pista) async {
+    try {
+      // Verificar que la pista tenga ID
+      if (pista.id.isEmpty) {
+        return false;
+      }
+      
+      // Actualizar la pista en Firestore
+      await _firestore.collection('pistas').doc(pista.id).update(pista.toJson());
+      
+      return true;
+    } catch (e) {
+      print('Error al actualizar pista: $e');
+      return false;
     }
   }
 

@@ -1,37 +1,110 @@
-import 'package:flutter_application/src/modelo/equipo_model.dart';
+import 'dart:async';
+import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import '../modelo/equipo_model.dart';
 
 class EquipoController {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
+  
+  // Stream controller para notificar cambios en la lista de equipos
+  static final _equiposStreamController = StreamController<List<EquipoModel>>.broadcast();
+  
+  // Stream para escuchar cambios en la lista de equipos
+  Stream<List<EquipoModel>> get equiposStream => _equiposStreamController.stream;
+  
+  // Constructor que inicia la escucha de cambios en Firebase
+  EquipoController() {
+    // Suscribirse al stream de Firebase
+    _firestore.collection('equipos').snapshots().listen((snapshot) {
+      final equipos = snapshot.docs
+          .map((doc) => EquipoModel.fromJson(doc.data()))
+          .toList();
+      _equiposStreamController.add(equipos);
+    });
+  }
+
   // Método para obtener todos los equipos
   Future<List<EquipoModel>> obtenerEquipos() async {
     try {
-      // En una aplicación real, aquí obtendrías los datos de los equipos desde Firebase o tu backend
-      // Por ahora, simulamos datos de ejemplo
-      await Future.delayed(const Duration(seconds: 1)); // Simular carga
+      final querySnapshot = await _firestore.collection('equipos').get();
+      final equipos = querySnapshot.docs
+          .map((doc) => EquipoModel.fromJson(doc.data()))
+          .toList();
       
-      return _generarEquiposEjemplo();
+      return equipos;
     } catch (e) {
       print('Error al obtener equipos: $e');
       return [];
     }
   }
 
+  // Método para crear un nuevo equipo con imagen
+  Future<bool> crearEquipoConImagen(EquipoModel equipo, File? logoImage) async {
+    try {
+      String logoUrl = equipo.logoUrl; // Usar la URL por defecto
+      
+      // Si hay una imagen, subirla a Firebase Storage
+      if (logoImage != null) {
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final path = 'equipos/${equipo.nombre}_$timestamp.jpg';
+        
+        // Subir la imagen a Firebase Storage
+        final ref = _storage.ref().child(path);
+        final uploadTask = ref.putFile(logoImage);
+        final snapshot = await uploadTask.whenComplete(() => null);
+        logoUrl = await snapshot.ref.getDownloadURL();
+      }
+      
+      // Crear una copia del equipo con la URL de la imagen
+      final equipoConLogo = equipo.copyWith(logoUrl: logoUrl);
+      
+      // Si no tiene ID, generar uno
+      final id = equipo.id.isEmpty ? 'equipo_${DateTime.now().millisecondsSinceEpoch}' : equipo.id;
+      final equipoConId = equipoConLogo.copyWith(id: id);
+      
+      // Guardar el equipo en Firestore
+      await _firestore.collection('equipos').doc(id).set(equipoConId.toJson());
+      
+      return true;
+    } catch (e) {
+      print('Error al crear equipo: $e');
+      return false;
+    }
+  }
+
+  // Método para crear un nuevo equipo
+  Future<bool> crearEquipo(EquipoModel equipo, String userIdCreador) async {
+    try {
+      final equipoConCapitan = equipo.copyWith(
+        jugadoresIds: [userIdCreador], // El capitán es el primer miembro
+      );
+      await _firestore.collection('equipos').doc(equipoConCapitan.id).set(equipoConCapitan.toJson());
+      return true;
+    } catch (e) {
+      print('Error al crear equipo: $e');
+      return false;
+    }
+  }
+
   // Método para buscar equipos por texto
   Future<List<EquipoModel>> buscarEquipos(String query) async {
     try {
-      // En una aplicación real, aquí buscarías los equipos en Firebase o tu backend
-      // Por ahora, filtramos los datos de ejemplo
-      await Future.delayed(const Duration(milliseconds: 500)); // Simular carga
-      
-      final equipos = _generarEquiposEjemplo();
-      
       if (query.isEmpty) {
-        return equipos;
+        return await obtenerEquipos();
       }
       
+      // Convertir la consulta a minúsculas para búsqueda insensible a mayúsculas
       final queryLower = query.toLowerCase();
+      
+      // Obtener todos los equipos y filtrar en memoria
+      final equipos = await obtenerEquipos();
+      
       return equipos.where((equipo) {
         return equipo.nombre.toLowerCase().contains(queryLower) ||
-               equipo.tipo.toLowerCase().contains(queryLower);
+               equipo.tipo.toLowerCase().contains(queryLower) ||
+               (equipo.descripcion?.toLowerCase().contains(queryLower) ?? false);
       }).toList();
     } catch (e) {
       print('Error al buscar equipos: $e');
@@ -42,45 +115,41 @@ class EquipoController {
   // Método para obtener un equipo por su ID
   Future<EquipoModel?> obtenerEquipoPorId(String equipoId) async {
     try {
-      // En una aplicación real, aquí obtendrías el equipo desde Firebase o tu backend
-      // Por ahora, buscamos en los datos de ejemplo
-      await Future.delayed(const Duration(milliseconds: 500)); // Simular carga
-      
-      final equipos = _generarEquiposEjemplo();
-      return equipos.firstWhere(
-        (equipo) => equipo.id == equipoId,
-        orElse: () => throw Exception('Equipo no encontrado'),
-      );
+      final doc = await _firestore.collection('equipos').doc(equipoId).get();
+      if (doc.exists) {
+        return EquipoModel.fromJson(doc.data()!);
+      }
+      return null;
     } catch (e) {
       print('Error al obtener equipo: $e');
       return null;
     }
   }
 
-  // Método para crear un nuevo equipo
-  Future<bool> crearEquipo(EquipoModel equipo) async {
-    try {
-      // En una aplicación real, aquí crearías el equipo en Firebase o tu backend
-      // Por ahora, simulamos una creación exitosa
-      await Future.delayed(const Duration(seconds: 1)); // Simular carga
-      
-      print('Equipo creado: ${equipo.nombre}');
-      return true;
-    } catch (e) {
-      print('Error al crear equipo: $e');
-      return false;
-    }
-  }
-
   // Método para unirse a un equipo
   Future<bool> unirseEquipo(String equipoId, String userId) async {
     try {
-      // En una aplicación real, aquí actualizarías el equipo en Firebase o tu backend
-      // Por ahora, simulamos una unión exitosa
-      await Future.delayed(const Duration(seconds: 1)); // Simular carga
+      final equipoRef = _firestore.collection('equipos').doc(equipoId);
       
-      print('Usuario $userId se unió al equipo $equipoId');
-      return true;
+      // Usar transacción para garantizar consistencia
+      return await _firestore.runTransaction<bool>((transaction) async {
+        final doc = await transaction.get(equipoRef);
+        if (!doc.exists) return false;
+        
+        final data = doc.data()!;
+        final jugadoresIds = List<String>.from(data['jugadoresIds'] ?? []);
+        
+        // Verificar si ya es miembro
+        if (jugadoresIds.contains(userId)) return true;
+        
+        // Agregar el jugador
+        jugadoresIds.add(userId);
+        
+        // Actualizar el documento
+        transaction.update(equipoRef, {'jugadoresIds': jugadoresIds});
+        
+        return true;
+      });
     } catch (e) {
       print('Error al unirse al equipo: $e');
       return false;
@@ -90,75 +159,35 @@ class EquipoController {
   // Método para abandonar un equipo
   Future<bool> abandonarEquipo(String equipoId, String userId) async {
     try {
-      // En una aplicación real, aquí actualizarías el equipo en Firebase o tu backend
-      // Por ahora, simulamos un abandono exitoso
-      await Future.delayed(const Duration(seconds: 1)); // Simular carga
+      final equipoRef = _firestore.collection('equipos').doc(equipoId);
       
-      print('Usuario $userId abandonó el equipo $equipoId');
-      return true;
+      // Usar transacción para garantizar consistencia
+      return await _firestore.runTransaction<bool>((transaction) async {
+        final doc = await transaction.get(equipoRef);
+        if (!doc.exists) return false;
+        
+        final data = doc.data()!;
+        final jugadoresIds = List<String>.from(data['jugadoresIds'] ?? []);
+        
+        // Verificar si es miembro
+        if (!jugadoresIds.contains(userId)) return true;
+        
+        // Eliminar el jugador
+        jugadoresIds.remove(userId);
+        
+        // Actualizar el documento
+        transaction.update(equipoRef, {'jugadoresIds': jugadoresIds});
+        
+        return true;
+      });
     } catch (e) {
       print('Error al abandonar el equipo: $e');
       return false;
     }
   }
-
-  // Método para generar datos de ejemplo
-  List<EquipoModel> _generarEquiposEjemplo() {
-    return [
-      EquipoModel(
-        id: 'equipo_1',
-        nombre: 'Esmayaos FC',
-        tipo: 'Fútbol Sala',
-        logoUrl: 'assets/logos/esmayaos.png',
-        descripcion: 'Equipo de fútbol sala amateur',
-        jugadoresIds: ['user_1', 'user_2', 'user_3'],
-        creadorId: 'user_1',
-      ),
-      EquipoModel(
-        id: 'equipo_2',
-        nombre: 'Laquetecuento FC',
-        tipo: 'Fútbol Sala',
-        logoUrl: 'assets/logos/laquetecuento.png',
-        descripcion: 'Equipo de fútbol sala recreativo',
-        jugadoresIds: ['user_2', 'user_4'],
-        creadorId: 'user_2',
-      ),
-      EquipoModel(
-        id: 'equipo_3',
-        nombre: 'Mondongo FC',
-        tipo: 'Fútbol 7',
-        logoUrl: 'assets/logos/mondongo.png',
-        descripcion: 'Equipo de fútbol 7 competitivo',
-        jugadoresIds: ['user_1', 'user_5', 'user_6'],
-        creadorId: 'user_5',
-      ),
-      EquipoModel(
-        id: 'equipo_4',
-        nombre: 'Aliados FC',
-        tipo: 'Fútbol Sala',
-        logoUrl: 'assets/logos/aliados.png',
-        descripcion: 'Equipo de fútbol sala universitario',
-        jugadoresIds: ['user_3', 'user_7'],
-        creadorId: 'user_3',
-      ),
-      EquipoModel(
-        id: 'equipo_5',
-        nombre: 'Deryaba FC',
-        tipo: 'Fútbol Sala',
-        logoUrl: 'assets/logos/deryaba.png',
-        descripcion: 'Equipo de fútbol sala de empresa',
-        jugadoresIds: ['user_8', 'user_9'],
-        creadorId: 'user_8',
-      ),
-      EquipoModel(
-        id: 'equipo_6',
-        nombre: 'Albiol FC',
-        tipo: 'Fútbol 11',
-        logoUrl: 'assets/logos/albiol.png',
-        descripcion: 'Equipo de fútbol 11 de barrio',
-        jugadoresIds: ['user_10', 'user_11', 'user_12'],
-        creadorId: 'user_10',
-      ),
-    ];
+  
+  // Método para cerrar el stream controller
+  void dispose() {
+    _equiposStreamController.close();
   }
 }

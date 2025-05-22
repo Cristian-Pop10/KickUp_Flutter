@@ -240,9 +240,7 @@ class _DetalleEquipoViewState extends State<DetalleEquipoView> {
                 // Información del equipo
                 _buildInfoRow('Jugadores', _equipo!.jugadoresIds.length.toString()),
                 const SizedBox(height: 15),
-                _buildInfoRow('Capitán', 'Luis Ruiz'),
-                const SizedBox(height: 15),
-                _buildInfoRow('Nivel', '4'),
+                _buildInfoRow('Nivel', _equipo!.nivel.toString() ?? 'Sin nivel'),
                 
                 const SizedBox(height: 25),
                 

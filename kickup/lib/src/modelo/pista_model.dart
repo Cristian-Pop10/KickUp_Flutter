@@ -4,10 +4,10 @@ class PistaModel {
   final String direccion;
   final double latitud;
   final double longitud;
-  final String? tipo; // Fútbol 7, Fútbol 11, Fútbol Sala, etc.
+  final String? tipo;
   final String? descripcion;
-  final double? precio; // Precio por hora
-  final bool? disponible;
+  final double? precio;
+  final bool disponible;
   final String? imagenUrl;
 
   PistaModel({
@@ -19,11 +19,11 @@ class PistaModel {
     this.tipo,
     this.descripcion,
     this.precio,
-    this.disponible,
+    required this.disponible,
     this.imagenUrl,
   });
 
-  // Constructor de copia con parámetros opcionales
+  // Método para crear una copia del modelo con algunos campos modificados
   PistaModel copyWith({
     String? id,
     String? nombre,
@@ -50,23 +50,7 @@ class PistaModel {
     );
   }
 
-  // Método para crear un PistaModel desde un Map (por ejemplo, desde JSON)
-  factory PistaModel.fromJson(Map<String, dynamic> json) {
-    return PistaModel(
-      id: json['id'],
-      nombre: json['nombre'],
-      direccion: json['direccion'],
-      latitud: json['latitud'],
-      longitud: json['longitud'],
-      tipo: json['tipo'],
-      descripcion: json['descripcion'],
-      precio: json['precio'],
-      disponible: json['disponible'],
-      imagenUrl: json['imagenUrl'],
-    );
-  }
-
-  // Método para convertir un PistaModel a un Map (por ejemplo, para JSON)
+  // Método para convertir el modelo a un mapa (para Firestore)
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -80,5 +64,21 @@ class PistaModel {
       'disponible': disponible,
       'imagenUrl': imagenUrl,
     };
+  }
+
+  // Método para crear un modelo a partir de un mapa (desde Firestore)
+  factory PistaModel.fromJson(Map<String, dynamic> json) {
+    return PistaModel(
+      id: json['id'] ?? '',
+      nombre: json['nombre'] ?? '',
+      direccion: json['direccion'] ?? '',
+      latitud: json['latitud'] ?? 0.0,
+      longitud: json['longitud'] ?? 0.0,
+      tipo: json['tipo'],
+      descripcion: json['descripcion'],
+      precio: json['precio'] != null ? json['precio'].toDouble() : null,
+      disponible: json['disponible'] ?? true,
+      imagenUrl: json['imagenUrl'],
+    );
   }
 }

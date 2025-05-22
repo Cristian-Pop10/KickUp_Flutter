@@ -4,46 +4,40 @@ import '../componentes/bottom_nav_bar.dart';
 import '../controlador/pista_controller.dart';
 import '../modelo/pista_model.dart';
 import 'detalle_pista_view.dart';
+import 'equipos_view.dart';
+import 'partidos_view.dart';
+import 'perfil_view.dart';
 
 class PistasView extends StatefulWidget {
   final String userId;
 
-  const PistasView({
-    Key? key,
-    required this.userId,
-  }) : super(key: key);
+  const PistasView({Key? key, required this.userId}) : super(key: key);
 
   @override
-  State<PistasView> createState() => _PistasViewState();
+  _PistasViewState createState() => _PistasViewState();
 }
 
 class _PistasViewState extends State<PistasView> {
   final PistaController _pistaController = PistaController();
-  final TextEditingController _searchController = TextEditingController();
-
   List<PistaModel> _pistas = [];
   bool _isLoading = true;
-  bool _isSearching = false;
-
-  GoogleMapController? _mapController;
+  bool _mostrarMapa = false;
   Set<Marker> _markers = {};
-
-  // Posición inicial del mapa (centro de España)
-  final CameraPosition _initialPosition = const CameraPosition(
-    target: LatLng(
-        37.4219, -2.2585), // Coordenadas de la zona mostrada en la imagen
-    zoom: 16.0,
-  );
-
+  
+  // Controlador para el mapa
+  GoogleMapController? _mapController;
+  
+  // Índice actual para el BottomNavBar (2 para la pestaña de pistas)
+  final int _currentIndex = 2;
+  
   @override
   void initState() {
     super.initState();
     _cargarPistas();
   }
-
+  
   @override
   void dispose() {
-    _searchController.dispose();
     _mapController?.dispose();
     super.dispose();
   }
@@ -55,81 +49,45 @@ class _PistasViewState extends State<PistasView> {
 
     try {
       final pistas = await _pistaController.obtenerPistas();
-
-      if (mounted) {
-        setState(() {
-          _pistas = pistas;
-          _isLoading = false;
-          _crearMarcadores();
-        });
-      }
+      
+      // Crear marcadores para el mapa
+      final markers = pistas.map((pista) {
+        return Marker(
+          markerId: MarkerId(pista.id),
+          position: LatLng(pista.latitud, pista.longitud),
+          infoWindow: InfoWindow(
+            title: pista.nombre,
+            snippet: pista.tipo ?? 'Pista deportiva',
+            onTap: () => _navegarADetallePista(pista.id),
+          ),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            pista.disponible ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueRed,
+          ),
+        );
+      }).toSet();
+      
+      setState(() {
+        _pistas = pistas;
+        _markers = markers;
+        _isLoading = false;
+      });
     } catch (e) {
+      print('Error al cargar pistas: $e');
+      setState(() {
+        _isLoading = false;
+      });
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error al cargar pistas: ${e.toString()}')),
         );
-        setState(() {
-          _isLoading = false;
-        });
       }
     }
   }
 
-  Future<void> _buscarPistas(String query) async {
-    setState(() {
-      _isSearching = true;
-    });
-
-    try {
-      final resultados = await _pistaController.buscarPistas(query);
-
-      if (mounted) {
-        setState(() {
-          _pistas = resultados;
-          _isSearching = false;
-          _crearMarcadores();
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al buscar pistas: ${e.toString()}')),
-        );
-        setState(() {
-          _isSearching = false;
-        });
-      }
-    }
-  }
-
-  void _crearMarcadores() {
-    final Set<Marker> markers = {};
-
-    for (final pista in _pistas) {
-      final marker = Marker(
-        markerId: MarkerId(pista.id),
-        position: LatLng(pista.latitud, pista.longitud),
-        infoWindow: InfoWindow(
-          title: pista.nombre,
-          snippet: pista.direccion,
-          onTap: () => _navegarADetallePista(pista.id),
-        ),
-        onTap: () {
-          // Mostrar información básica al tocar el marcador
-          _mapController?.showMarkerInfoWindow(MarkerId(pista.id));
-        },
-      );
-
-      markers.add(marker);
-    }
-
-    setState(() {
-      _markers = markers;
-    });
-  }
-
-  void _navegarADetallePista(String pistaId) {
-    Navigator.of(context).push(
+  void _navegarADetallePista(String pistaId) async {
+    await Navigator.push(
+      context,
       MaterialPageRoute(
         builder: (context) => DetallePistaView(
           pistaId: pistaId,
@@ -137,106 +95,328 @@ class _PistasViewState extends State<PistasView> {
         ),
       ),
     );
+    
+    // Recargar pistas al volver
+    _cargarPistas();
   }
-
-  void _onMapCreated(GoogleMapController controller) {
-    _mapController = controller;
+  
+  // Método para manejar la navegación entre pestañas
+  void _onNavItemTapped(int index) {
+    if (index == _currentIndex) return; // No hacer nada si ya estamos en esta pestaña
+    
+    Widget nextScreen;
+    
+    switch (index) {
+      case 0:
+        nextScreen = PartidosView(userId: widget.userId);
+        break;
+      case 1:
+        nextScreen = EquiposView(userId: widget.userId);
+        break;
+      case 2:
+        return; // Ya estamos en la pestaña de pistas
+      case 3:
+        nextScreen = PerfilView(userId: widget.userId);
+        break;
+      default:
+        return;
+    }
+    
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => nextScreen),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFE5EFE6), // Fondo verde claro
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: const Text(
-          'Pistas',
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-            fontSize: 24,
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(60), // Altura fija para el AppBar
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: const BoxDecoration(
+            color: Color(0xFFE5EFE6), // Mismo color que el fondo
+          ),
+          child: SafeArea(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Título "Pistas"
+                const Text(
+                  'Pistas',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 22,
+                  ),
+                ),
+                
+                // Botones de acción
+                Row(
+                  children: [
+                    // Botón para alternar entre lista y mapa
+                    Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF5A9A7A).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: IconButton(
+                        icon: Icon(
+                          _mostrarMapa ? Icons.list : Icons.map,
+                          color: const Color(0xFF5A9A7A),
+                          size: 24,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _mostrarMapa = !_mostrarMapa;
+                          });
+                        },
+                        tooltip: _mostrarMapa ? 'Ver lista' : 'Ver mapa',
+                        padding: const EdgeInsets.all(8),
+                        constraints: const BoxConstraints(), // Eliminar restricciones de tamaño
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Botón para refrescar
+                    Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF5A9A7A).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: IconButton(
+                        icon: const Icon(
+                          Icons.refresh,
+                          color: Color(0xFF5A9A7A),
+                          size: 24,
+                        ),
+                        onPressed: _cargarPistas,
+                        tooltip: 'Refrescar',
+                        padding: const EdgeInsets.all(8),
+                        constraints: const BoxConstraints(), // Eliminar restricciones de tamaño
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
-        actions: [
-          // Avatar del usuario
-          GestureDetector(
-            onTap: () {
-              Navigator.of(context).pushNamed('/perfil');
-            },
-            child: Container(
-              margin: const EdgeInsets.only(right: 16),
-              child: const CircleAvatar(
-                radius: 20,
-                backgroundImage: AssetImage('assets/profile.jpg'),
-              ),
-            ),
-          ),
-        ],
       ),
-      body: Column(
-        children: [
-          // Barra de búsqueda
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Container(
-              height: 50,
-              decoration: BoxDecoration(
-                color: const Color(0xFFD7D7D7),
-                borderRadius: BorderRadius.circular(25),
+      body: Container(
+        margin: const EdgeInsets.fromLTRB(16, 8, 16, 16), // Reducir el margen superior
+        decoration: BoxDecoration(
+          color: const Color(0xFFE5EFE6), // Mismo color que el fondo
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _pistas.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text(
+                          'No hay pistas disponibles',
+                          style: TextStyle(fontSize: 18),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: _cargarPistas,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF5A9A7A),
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text('Reintentar'),
+                        ),
+                      ],
+                    ),
+                  )
+                : _mostrarMapa
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: _buildMapa(),
+                      )
+                    : _buildLista(),
+      ),
+      // Añadir el BottomNavBar
+      bottomNavigationBar: BottomNavBar(
+        currentIndex: _currentIndex,
+        onTap: _onNavItemTapped,
+      ),
+    );
+  }
+
+  Widget _buildLista() {
+    return RefreshIndicator(
+      onRefresh: _cargarPistas,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(8),
+        itemCount: _pistas.length,
+        itemBuilder: (context, index) {
+          final pista = _pistas[index];
+          return _buildPistaCard(pista);
+        },
+      ),
+    );
+  }
+
+  Widget _buildMapa() {
+    return GoogleMap(
+      initialCameraPosition: const CameraPosition(
+        target: LatLng(40.416775, -3.703790), // Madrid por defecto
+        zoom: 12,
+      ),
+      markers: _markers,
+      myLocationEnabled: true,
+      myLocationButtonEnabled: true,
+      mapType: MapType.normal,
+      onMapCreated: (controller) {
+        _mapController = controller;
+        
+        // Si hay pistas, centrar el mapa en la primera
+        if (_pistas.isNotEmpty) {
+          _mapController?.animateCamera(
+            CameraUpdate.newLatLngZoom(
+              LatLng(_pistas.first.latitud, _pistas.first.longitud),
+              12,
+            ),
+          );
+        }
+      },
+    );
+  }
+
+  Widget _buildPistaCard(PistaModel pista) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15),
+      ),
+      elevation: 3,
+      child: InkWell(
+        onTap: () => _navegarADetallePista(pista.id),
+        borderRadius: BorderRadius.circular(15),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Imagen de la pista
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(8),
+                  image: pista.imagenUrl != null && pista.imagenUrl!.isNotEmpty
+                      ? DecorationImage(
+                          image: NetworkImage(pista.imagenUrl!),
+                          fit: BoxFit.cover,
+                        )
+                      : null,
+                ),
+                child: pista.imagenUrl == null || pista.imagenUrl!.isEmpty
+                    ? const Icon(
+                        Icons.sports_soccer,
+                        size: 40,
+                        color: Colors.grey,
+                      )
+                    : null,
               ),
-              child: TextField(
-                controller: _searchController,
-                onChanged: _buscarPistas,
-                decoration: const InputDecoration(
-                  hintText: 'Buscar',
-                  hintStyle: TextStyle(color: Colors.grey),
-                  prefixIcon: Icon(Icons.search, color: Colors.grey),
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 15),
+              const SizedBox(width: 16),
+              
+              // Información de la pista
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Nombre y disponibilidad
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            pista.nombre,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: pista.disponible ? Colors.green : Colors.red,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            pista.disponible ? 'Disponible' : 'No disponible',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    
+                    // Tipo
+                    if (pista.tipo != null && pista.tipo!.isNotEmpty)
+                      Text(
+                        pista.tipo!,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    const SizedBox(height: 4),
+                    
+                    // Dirección
+                    Row(
+                      children: [
+                        const Icon(Icons.location_on, size: 16),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            pista.direccion,
+                            style: const TextStyle(fontSize: 14),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    
+                    // Precio
+                    if (pista.precio != null)
+                      Row(
+                        children: [
+                          const Icon(Icons.euro, size: 16),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${pista.precio}€',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green,
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
                 ),
               ),
-            ),
+            ],
           ),
-
-          // Mapa
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    child: GoogleMap(
-                      onMapCreated: _onMapCreated,
-                      initialCameraPosition: _initialPosition,
-                      markers: _markers,
-                      myLocationEnabled: true,
-                      myLocationButtonEnabled: true,
-                      mapToolbarEnabled: false,
-                      zoomControlsEnabled: false,
-                      compassEnabled: true,
-                    ),
-                  ),
-          ),
-
-          // Barra de navegación
-          BottomNavBar(
-            currentIndex: 2, // Índice de la pantalla actual
-            onTap: (index) {
-              switch (index) {
-                case 0:
-                  Navigator.of(context).pushReplacementNamed('/partidos');
-                  break;
-                case 1:
-                  Navigator.of(context).pushReplacementNamed('/equipos');
-                  break;
-                case 2:
-                  break;
-              }
-            },
-          ),
-        ],
+        ),
       ),
     );
   }
 }
-//   );

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application/src/vista/crear_equipo_view.dart';
 import '../controlador/equipo_controller.dart';
 import '../modelo/equipo_model.dart';
 import 'detalle_equipo_view.dart';
@@ -20,11 +21,13 @@ class _EquiposViewState extends State<EquiposView> {
   final EquipoController _equipoController = EquipoController();
   final TextEditingController _searchController = TextEditingController();
   List<EquipoModel> _equipos = [];
+  List<EquipoModel> _equiposFiltrados = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
+    _searchController.addListener(_filtrarEquipos);
     _cargarEquipos();
   }
 
@@ -43,7 +46,17 @@ class _EquiposViewState extends State<EquiposView> {
 
     setState(() {
       _equipos = equipos;
+      _equiposFiltrados = equipos;
       _isLoading = false;
+    });
+  }
+
+  void _filtrarEquipos() {
+    final query = _searchController.text.toLowerCase();
+    setState(() {
+      _equiposFiltrados = _equipos
+          .where((equipo) => equipo.nombre.toLowerCase().contains(query))
+          .toList();
     });
   }
 
@@ -58,22 +71,31 @@ class _EquiposViewState extends State<EquiposView> {
     );
   }
 
+  void _navegarACrearEquipo() async {
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => CrearEquipoView(userId: widget.userId),
+      ),
+    );
+
+    if (result == true) {
+      _cargarEquipos();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFD7EAD9), // Fondo verde claro
+      backgroundColor: const Color(0xFFD7EAD9),
       body: Container(
         margin: const EdgeInsets.fromLTRB(16, 60, 16, 16),
         decoration: BoxDecoration(
-          color: const Color(0xFFE5EFE6), // Fondo más claro para el contenido
+          color: const Color(0xFFE5EFE6),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Column(
           children: [
-            // Espacio en la parte superior
             const SizedBox(height: 16),
-
-            // Encabezado con el título y el botón de perfil
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Row(
@@ -81,10 +103,7 @@ class _EquiposViewState extends State<EquiposView> {
                 children: [
                   const Text(
                     'Equipos',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                   ),
                   GestureDetector(
                     onTap: () {
@@ -98,8 +117,6 @@ class _EquiposViewState extends State<EquiposView> {
                 ],
               ),
             ),
-
-            // Barra de búsqueda
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Container(
@@ -110,9 +127,6 @@ class _EquiposViewState extends State<EquiposView> {
                 ),
                 child: TextField(
                   controller: _searchController,
-                  onChanged: (query) {
-                    // Lógica de búsqueda
-                  },
                   decoration: InputDecoration(
                     hintText: 'Buscar',
                     hintStyle: const TextStyle(color: Colors.grey),
@@ -126,46 +140,76 @@ class _EquiposViewState extends State<EquiposView> {
                 ),
               ),
             ),
-
             const SizedBox(height: 16),
-
-            // Lista de equipos
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _navegarACrearEquipo,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF5A9A7A),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(25),
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.add),
+                      SizedBox(width: 8),
+                      Text(
+                        'AÑADIR',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : GridView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        childAspectRatio: 0.85,
-                        crossAxisSpacing: 16,
-                        mainAxisSpacing: 16,
-                      ),
-                      itemCount: _equipos.length,
-                      itemBuilder: (context, index) {
-                        final equipo = _equipos[index];
-                        return _EquipoCard(
-                          nombre: equipo.nombre,
-                          tipo: equipo.tipo,
-                          logoUrl: equipo.logoUrl,
-                          onTap: () => _navegarADetalleEquipo(equipo.id),
-                        );
-                      },
-                    ),
+                  : _equiposFiltrados.isEmpty
+                      ? const Center(child: Text('No se encontraron equipos.'))
+                      : GridView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            childAspectRatio: 0.85,
+                            crossAxisSpacing: 16,
+                            mainAxisSpacing: 16,
+                          ),
+                          itemCount: _equiposFiltrados.length,
+                          itemBuilder: (context, index) {
+                            final equipo = _equiposFiltrados[index];
+                            return _EquipoCard(
+                              nombre: equipo.nombre,
+                              tipo: equipo.tipo,
+                              logoUrl: equipo.logoUrl,
+                              onTap: () => _navegarADetalleEquipo(equipo.id),
+                            );
+                          },
+                        ),
             ),
           ],
         ),
       ),
       bottomNavigationBar: BottomNavBar(
-        currentIndex: 1, // Índice de la pantalla actual
+        currentIndex: 1,
         onTap: (index) {
           switch (index) {
             case 0:
               Navigator.of(context).pushReplacementNamed('/partidos');
               break;
             case 1:
-              // Ya estamos en esta pantalla
               break;
             case 2:
               Navigator.of(context).pushReplacementNamed('/pistas');
@@ -177,7 +221,6 @@ class _EquiposViewState extends State<EquiposView> {
   }
 }
 
-// Widget para cada tarjeta de equipo
 class _EquipoCard extends StatelessWidget {
   final String nombre;
   final String tipo;
@@ -199,7 +242,6 @@ class _EquipoCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Logo del equipo
           Container(
             width: double.infinity,
             height: 120,
@@ -208,7 +250,7 @@ class _EquipoCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(15),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black,
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
@@ -232,8 +274,6 @@ class _EquipoCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-
-          // Tipo de fútbol
           Text(
             tipo,
             style: TextStyle(
@@ -243,8 +283,6 @@ class _EquipoCard extends StatelessWidget {
             ),
             textAlign: TextAlign.center,
           ),
-
-          // Nombre del equipo
           Expanded(
             child: Text(
               nombre,
