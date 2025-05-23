@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application/src/controlador/auth_controller.dart';
-import 'package:flutter_application/src/controlador/perfil_controller.dart';
-import 'package:flutter_application/src/modelo/user_model.dart';
+import 'package:kickup/src/controlador/auth_controller.dart';
+import 'dart:io';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:kickup/src/controlador/perfil_controller.dart';
+import 'package:kickup/src/modelo/user_model.dart';
 
 class PerfilView extends StatefulWidget {
   final String userId;
@@ -18,6 +20,7 @@ class _PerfilViewState extends State<PerfilView> {
   UserModel? _usuario;
   bool _isLoading = true;
   bool _isEditing = false;
+  bool _isUploadingImage = false;
 
   // Lista de posiciones disponibles
   final List<String> _posiciones = [
@@ -39,7 +42,7 @@ class _PerfilViewState extends State<PerfilView> {
   String? _posicionSeleccionada;
 
   // Color para los campos de formulario en modo edición
-  final Color _formFieldColor = Colors.white; // Color blanco para todos los campos en modo edición
+  final Color _formFieldColor = Colors.white;
 
   @override
   void initState() {
@@ -100,14 +103,38 @@ class _PerfilViewState extends State<PerfilView> {
   Future<void> _guardarCambios() async {
     if (_usuario == null) return;
 
+    // Validar campos obligatorios
+    if (_nombreController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('El nombre es obligatorio')),
+      );
+      return;
+    }
+
+    if (_emailController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('El email es obligatorio')),
+      );
+      return;
+    }
+
+    // Validar formato de email
+    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+    if (!emailRegex.hasMatch(_emailController.text.trim())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Formato de email inválido')),
+      );
+      return;
+    }
+
     final usuarioActualizado = _usuario!.copyWith(
-      nombre: _nombreController.text,
-      apellidos: _apellidosController.text,
+      nombre: _nombreController.text.trim(),
+      apellidos: _apellidosController.text.trim(),
       edad: int.tryParse(_edadController.text),
       nivel: int.tryParse(_nivelController.text),
       posicion: _posicionSeleccionada,
-      telefono: _telefonoController.text,
-      email: _emailController.text,
+      telefono: _telefonoController.text.trim(),
+      email: _emailController.text.trim(),
     );
 
     final success = await _perfilController.actualizarPerfil(usuarioActualizado);
@@ -120,11 +147,17 @@ class _PerfilViewState extends State<PerfilView> {
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Perfil actualizado correctamente')),
+          const SnackBar(
+            content: Text('Perfil actualizado correctamente'),
+            backgroundColor: Colors.green,
+          ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error al actualizar el perfil')),
+          const SnackBar(
+            content: Text('Error al actualizar el perfil'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -156,10 +189,192 @@ class _PerfilViewState extends State<PerfilView> {
     }
   }
 
+  void _mostrarOpcionesImagen() async {
+    if (_isUploadingImage) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ya hay una subida en progreso')),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFFE5EFE6),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Cambiar foto de perfil',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.photo_library, color: Color(0xFF5A9A7A)),
+                title: const Text('Elegir de la galería'),
+                onTap: () async {
+                  Navigator.of(context).pop();
+                  final imagen = await _perfilController.seleccionarImagenGaleria();
+                  if (imagen != null) {
+                    await _subirYActualizarFoto(imagen);
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.camera_alt, color: Color(0xFF5A9A7A)),
+                title: const Text('Hacer una foto'),
+                onTap: () async {
+                  Navigator.of(context).pop();
+                  final imagen = await _perfilController.tomarFoto();
+                  if (imagen != null) {
+                    await _subirYActualizarFoto(imagen);
+                  }
+                },
+              ),
+              if (_usuario?.profileImageUrl != null && _usuario!.profileImageUrl!.isNotEmpty)
+                ListTile(
+                  leading: const Icon(Icons.delete, color: Colors.red),
+                  title: const Text('Eliminar foto actual'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _eliminarFoto();
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _subirYActualizarFoto(File imagen) async {
+    if (_usuario == null || _isUploadingImage) return;
+
+    setState(() => _isUploadingImage = true);
+
+    try {
+      // Mostrar diálogo de progreso
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              const Text('Subiendo imagen...'),
+              const SizedBox(height: 8),
+              Text(
+                'Por favor, mantén la aplicación abierta',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      final exito = await _perfilController.actualizarFotoPerfil(imagen, _usuario!.id!);
+
+      // Cerrar diálogo de progreso
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+
+      if (exito) {
+        await _cargarUsuario();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Foto de perfil actualizada correctamente'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No se pudo actualizar la foto. Inténtalo de nuevo.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error al subir imagen: $e');
+      
+      // Cerrar diálogo de progreso si está abierto
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isUploadingImage = false);
+      }
+    }
+  }
+
+  Future<void> _eliminarFoto() async {
+    if (_usuario?.id == null) return;
+
+    setState(() => _isUploadingImage = true);
+
+    try {
+      final success = await _perfilController.eliminarFotoPerfil(_usuario!.id!);
+      
+      if (success) {
+        await _cargarUsuario();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Foto de perfil eliminada')),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Error al eliminar la foto de perfil')),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error al eliminar foto: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString()}')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isUploadingImage = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFE5EFE6), // Fondo verde claro
+      backgroundColor: const Color(0xFFE5EFE6),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -175,7 +390,6 @@ class _PerfilViewState extends State<PerfilView> {
           ),
         ),
         actions: [
-          // Botón de cerrar sesión
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.black),
             onPressed: _cerrarSesion,
@@ -190,7 +404,7 @@ class _PerfilViewState extends State<PerfilView> {
                   child: Container(
                     margin: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE5EFE6), // Mismo color que el fondo
+                      color: const Color(0xFFE5EFE6),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Column(
@@ -201,12 +415,51 @@ class _PerfilViewState extends State<PerfilView> {
                           child: Column(
                             children: [
                               const SizedBox(height: 20),
-                              CircleAvatar(
-                                radius: 60,
-                                backgroundImage: AssetImage(
-                                    _usuario!.profileImageUrl ??
-                                        'assets/profile.jpg'),
+                              GestureDetector(
+                                onTap: _isUploadingImage ? null : _mostrarOpcionesImagen,
+                                child: Stack(
+                                  children: [
+                                    _isUploadingImage
+                                        ? const CircleAvatar(
+                                            radius: 60,
+                                            backgroundColor: Colors.grey,
+                                            child: CircularProgressIndicator(),
+                                          )
+                                        : CircleAvatar(
+                                            radius: 60,
+                                            backgroundImage: _usuario!.profileImageUrl != null && _usuario!.profileImageUrl!.isNotEmpty
+                                                ? CachedNetworkImageProvider(_usuario!.profileImageUrl!)
+                                                : const AssetImage('assets/profile.jpg') as ImageProvider,
+                                            backgroundColor: Colors.grey,
+                                          ),
+                                    if (!_isUploadingImage)
+                                      Positioned(
+                                        bottom: 0,
+                                        right: 0,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF5A9A7A),
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                              color: Colors.white,
+                                              width: 2,
+                                            ),
+                                          ),
+                                          child: const Icon(
+                                            Icons.camera_alt,
+                                            color: Colors.white,
+                                            size: 20,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
                               ),
+                              if (!_isUploadingImage)
+                                const SizedBox(height: 8),
+                              if (!_isUploadingImage)
+                               
                               const SizedBox(height: 16),
                               _isEditing
                                   ? Column(
@@ -214,10 +467,11 @@ class _PerfilViewState extends State<PerfilView> {
                                         TextField(
                                           controller: _nombreController,
                                           decoration: InputDecoration(
-                                            labelText: 'Nombre',
+                                            labelText: 'Nombre *',
                                             border: const OutlineInputBorder(),
                                             filled: true,
                                             fillColor: _formFieldColor,
+                                            errorText: _nombreController.text.trim().isEmpty ? 'Campo obligatorio' : null,
                                           ),
                                         ),
                                         const SizedBox(height: 8),
@@ -257,19 +511,13 @@ class _PerfilViewState extends State<PerfilView> {
                                     _isEditing = !_isEditing;
                                     if (!_isEditing) {
                                       // Si estábamos editando y cancelamos, restauramos los valores originales
-                                      _nombreController.text =
-                                          _usuario!.nombre ?? '';
-                                      _apellidosController.text =
-                                          _usuario!.apellidos ?? '';
-                                      _edadController.text =
-                                          _usuario!.edad?.toString() ?? '';
-                                      _nivelController.text =
-                                          _usuario!.nivel?.toString() ?? '';
+                                      _nombreController.text = _usuario!.nombre ?? '';
+                                      _apellidosController.text = _usuario!.apellidos ?? '';
+                                      _edadController.text = _usuario!.edad?.toString() ?? '';
+                                      _nivelController.text = _usuario!.nivel?.toString() ?? '';
                                       _posicionSeleccionada = _usuario!.posicion?.toLowerCase();
-                                      _telefonoController.text =
-                                          _usuario!.telefono ?? '';
-                                      _emailController.text =
-                                          _usuario!.email ?? '';
+                                      _telefonoController.text = _usuario!.telefono ?? '';
+                                      _emailController.text = _usuario!.email ?? '';
                                     }
                                   });
                                 },
@@ -322,6 +570,7 @@ class _PerfilViewState extends State<PerfilView> {
                                 _usuario!.email ?? '',
                                 _emailController,
                                 keyboardType: TextInputType.emailAddress,
+                                isRequired: true,
                               ),
                               const SizedBox(height: 32),
                               // Botón Guardar cambios (solo visible en modo edición)
@@ -333,8 +582,7 @@ class _PerfilViewState extends State<PerfilView> {
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: const Color(0xFF5A9A7A),
                                       foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 16),
+                                      padding: const EdgeInsets.symmetric(vertical: 16),
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(30),
                                       ),
@@ -364,12 +612,13 @@ class _PerfilViewState extends State<PerfilView> {
     String value,
     TextEditingController controller, {
     TextInputType keyboardType = TextInputType.text,
+    bool isRequired = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          label,
+          isRequired ? '$label *' : label,
           style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
@@ -382,7 +631,7 @@ class _PerfilViewState extends State<PerfilView> {
                 keyboardType: keyboardType,
                 decoration: InputDecoration(
                   filled: true,
-                  fillColor: _formFieldColor, // Color blanco para campos en modo edición
+                  fillColor: _formFieldColor,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -413,7 +662,6 @@ class _PerfilViewState extends State<PerfilView> {
     );
   }
 
-  // Método para construir el campo de posición con dropdown
   Widget _buildPosicionField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -429,9 +677,9 @@ class _PerfilViewState extends State<PerfilView> {
         _isEditing
             ? Container(
                 decoration: BoxDecoration(
-                  color: _formFieldColor, // Color blanco para campos en modo edición
+                  color: _formFieldColor,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.grey.shade400), // Añadir borde para consistencia
+                  border: Border.all(color: Colors.grey.shade400),
                 ),
                 child: DropdownButtonFormField<String>(
                   value: _posicionSeleccionada,
@@ -452,7 +700,7 @@ class _PerfilViewState extends State<PerfilView> {
                     return DropdownMenuItem<String>(
                       value: posicion,
                       child: Text(
-                        posicion[0].toUpperCase() + posicion.substring(1), // Capitalizar primera letra
+                        posicion[0].toUpperCase() + posicion.substring(1),
                         style: const TextStyle(fontSize: 16),
                       ),
                     );
@@ -462,7 +710,7 @@ class _PerfilViewState extends State<PerfilView> {
                       _posicionSeleccionada = newValue;
                     });
                   },
-                  dropdownColor: _formFieldColor, // Color del menú desplegable
+                  dropdownColor: _formFieldColor,
                 ),
               )
             : Container(
@@ -477,7 +725,7 @@ class _PerfilViewState extends State<PerfilView> {
                 ),
                 child: Text(
                   _usuario!.posicion != null && _usuario!.posicion!.isNotEmpty
-                      ? _usuario!.posicion![0].toUpperCase() + _usuario!.posicion!.substring(1) // Capitalizar primera letra
+                      ? _usuario!.posicion![0].toUpperCase() + _usuario!.posicion!.substring(1)
                       : '',
                   style: const TextStyle(
                     fontSize: 16,

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application/src/controlador/auth_controller.dart';
-import 'package:flutter_application/src/controlador/partido_controller.dart';
-import 'package:flutter_application/src/modelo/partido_model.dart';
-import 'package:flutter_application/src/vista/detalle_partido_view.dart';
-import 'package:flutter_application/src/vista/crear_partido_view.dart';
+import 'package:kickup/src/controlador/auth_controller.dart';
+import 'package:kickup/src/controlador/partido_controller.dart';
+import 'package:kickup/src/modelo/partido_model.dart';
+import 'package:kickup/src/vista/crear_partido_view.dart';
+import 'package:kickup/src/vista/detalle_partido_view.dart';
 import '../componentes/bottom_nav_bar.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class PartidosView extends StatefulWidget {
   final String userId;
@@ -142,14 +143,37 @@ class _PartidosViewState extends State<PartidosView> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  GestureDetector(
-                    onTap: () {
-                      _authController.navigateToPerfil(context);
+                  StreamBuilder<DocumentSnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('usuarios')
+                        .doc(widget.userId)
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const CircleAvatar(
+                          radius: 20,
+                          backgroundColor: Colors.grey,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        );
+                      }
+                      String? imageUrl;
+                      if (snapshot.hasData && snapshot.data!.data() != null) {
+                        final data = snapshot.data!.data() as Map<String, dynamic>;
+                        imageUrl = data['profileImageUrl'] as String?;
+                      }
+                      return GestureDetector(
+                        onTap: () {
+                          _authController.navigateToPerfil(context);
+                        },
+                        child: CircleAvatar(
+                          radius: 20,
+                          backgroundColor: Colors.grey[300],
+                          backgroundImage: (imageUrl != null && imageUrl.isNotEmpty)
+                              ? NetworkImage(imageUrl)
+                              : const AssetImage('assets/profile.jpg') as ImageProvider,
+                        ),
+                      );
                     },
-                    child: const CircleAvatar(
-                      radius: 20,
-                      backgroundImage: AssetImage('assets/profile.jpg'),
-                    ),
                   ),
                 ],
               ),

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application/src/vista/crear_equipo_view.dart';
+import 'package:kickup/src/vista/crear_equipo_view.dart';
 import '../controlador/equipo_controller.dart';
 import '../modelo/equipo_model.dart';
 import 'detalle_equipo_view.dart';
 import '../componentes/bottom_nav_bar.dart';
+import '../controlador/auth_controller.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class EquiposView extends StatefulWidget {
   final String userId;
@@ -19,6 +21,7 @@ class EquiposView extends StatefulWidget {
 
 class _EquiposViewState extends State<EquiposView> {
   final EquipoController _equipoController = EquipoController();
+  final AuthController _authController = AuthController();
   final TextEditingController _searchController = TextEditingController();
   List<EquipoModel> _equipos = [];
   List<EquipoModel> _equiposFiltrados = [];
@@ -105,14 +108,37 @@ class _EquiposViewState extends State<EquiposView> {
                     'Equipos',
                     style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                   ),
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.of(context).pushNamed('/perfil');
+                  StreamBuilder<DocumentSnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('usuarios')
+                        .doc(widget.userId)
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const CircleAvatar(
+                          radius: 20,
+                          backgroundColor: Colors.grey,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        );
+                      }
+                      String? imageUrl;
+                      if (snapshot.hasData && snapshot.data!.data() != null) {
+                        final data = snapshot.data!.data() as Map<String, dynamic>;
+                        imageUrl = data['profileImageUrl'] as String?;
+                      }
+                      return GestureDetector(
+                        onTap: () {
+                          _authController.navigateToPerfil(context);
+                        },
+                        child: CircleAvatar(
+                          radius: 20,
+                          backgroundColor: Colors.grey[300],
+                          backgroundImage: (imageUrl != null && imageUrl.isNotEmpty)
+                              ? NetworkImage(imageUrl)
+                              : const AssetImage('assets/profile.jpg') as ImageProvider,
+                        ),
+                      );
                     },
-                    child: const CircleAvatar(
-                      radius: 20,
-                      backgroundImage: AssetImage('assets/profile.jpg'),
-                    ),
                   ),
                 ],
               ),

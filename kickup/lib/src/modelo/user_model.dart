@@ -67,7 +67,7 @@ class UserModel {
       nivel: json['nivel'] != null ? int.parse(json['nivel'].toString()) : null,
       posicion: json['posicion'],
       telefono: json['telefono'],
-      profileImageUrl: json['profileImageUrl'],
+      profileImageUrl: json['profileImageUrl'] as String?,
       createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : null,
     );
   }

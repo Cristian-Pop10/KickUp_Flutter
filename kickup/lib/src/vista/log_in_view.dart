@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application/src/vista/partidos_view.dart';
-import 'package:flutter_application/src/vista/sign_up_view.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:kickup/src/vista/partidos_view.dart';
+import 'package:kickup/src/vista/sign_up_view.dart';
 import '../preferences/pref_usuarios.dart';
 
 class LogInPage extends StatefulWidget {

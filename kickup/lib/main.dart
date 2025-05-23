@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:kickup/src/preferences/pref_usuarios.dart';
+import 'package:kickup/src/vista/detalle_equipo_view.dart';
+import 'package:kickup/src/vista/detalle_partido_view.dart';
+import 'package:kickup/src/vista/detalle_pista_view.dart';
+import 'package:kickup/src/vista/equipos_view.dart';
+import 'package:kickup/src/vista/log_in_view.dart';
+import 'package:kickup/src/vista/partidos_view.dart';
+import 'package:kickup/src/vista/perfil_view.dart';
+import 'package:kickup/src/vista/pista_view.dart';
 import 'firebase_options.dart';
-import 'package:flutter_application/src/preferences/pref_usuarios.dart';
-import 'package:flutter_application/src/vista/detalle_equipo_view.dart';
-import 'package:flutter_application/src/vista/detalle_partido_view.dart';
-import 'package:flutter_application/src/vista/detalle_pista_view.dart';
-import 'package:flutter_application/src/vista/equipos_view.dart';
-import 'package:flutter_application/src/vista/log_in_view.dart';
-import 'package:flutter_application/src/vista/partidos_view.dart';
-import 'package:flutter_application/src/vista/perfil_view.dart';
-import 'package:flutter_application/src/vista/pista_view.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

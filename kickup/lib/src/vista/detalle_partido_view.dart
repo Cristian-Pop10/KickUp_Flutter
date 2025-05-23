@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application/src/controlador/partido_controller.dart';
-import 'package:flutter_application/src/modelo/partido_model.dart';
-import 'package:flutter_application/src/servicio/user_service.dart';
+import 'package:kickup/src/controlador/auth_controller.dart';
+import 'package:kickup/src/controlador/partido_controller.dart';
+import 'package:kickup/src/modelo/partido_model.dart';
+import 'package:kickup/src/servicio/user_service.dart';
 
 class DetallePartidoView extends StatefulWidget {
   final String partidoId;
   final String userId;
 
-  const DetallePartidoView({
+  final AuthController authController = AuthController();
+
+  DetallePartidoView({
     Key? key,
     required this.partidoId,
     required this.userId,
@@ -368,10 +371,21 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
                                 itemBuilder: (context, index) {
                                   final jugador = _partido!.jugadores[index];
                                   return ListTile(
-                                    leading: CircleAvatar(
-                                      backgroundImage: AssetImage(
-                                          jugador.profileImageUrl ??
-                                              'assets/profile.jpg'),
+                                    leading: FutureBuilder<String?>(
+                                      future: widget.authController
+                                          .getProfileImageUrl(widget.userId),
+                                      builder: (context, snapshot) {
+                                        final imageUrl = snapshot.data;
+                                        return CircleAvatar(
+                                          radius: 20,
+                                          backgroundImage: (imageUrl != null &&
+                                                  imageUrl.isNotEmpty)
+                                              ? NetworkImage(imageUrl)
+                                              : const AssetImage(
+                                                  'assets/profile.jpg')
+                                                  as ImageProvider,
+                                        );
+                                      },
                                     ),
                                     title: Text(
                                       '${jugador.nombre} ${jugador.apellidos}',

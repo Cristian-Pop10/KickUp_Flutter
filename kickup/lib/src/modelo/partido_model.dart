@@ -1,4 +1,4 @@
-import 'package:flutter_application/src/modelo/user_model.dart';
+import 'package:kickup/src/modelo/user_model.dart';
 
 class PartidoModel {
   final String id;

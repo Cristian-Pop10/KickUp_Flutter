@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application/src/modelo/user_model.dart';
+import 'package:kickup/src/modelo/user_model.dart';
 import '../controlador/auth_controller.dart';
 import '../modelo/signup_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';

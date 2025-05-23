@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../controlador/equipo_controller.dart';
 import '../modelo/equipo_model.dart';
 import 'dart:io';
-import 'package:image_picker/image_picker.dart';
 
 class CrearEquipoView extends StatefulWidget {
   final String userId;

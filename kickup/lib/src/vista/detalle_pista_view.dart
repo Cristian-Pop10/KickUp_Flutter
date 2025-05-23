@@ -106,16 +106,16 @@ class _DetallePistaViewState extends State<DetallePistaView> {
                         height: 200,
                         decoration: BoxDecoration(
                           color: Colors.grey[300],
-                          image: _pista!.imagenUrl != null &&
-                                  _pista!.imagenUrl!.isNotEmpty
+                          image: _pista!.imagenUrl != null && _pista!.imagenUrl!.isNotEmpty
                               ? DecorationImage(
-                                  image: NetworkImage(_pista!.imagenUrl!),
+                                  image: _pista!.imagenUrl!.startsWith('assets/')
+                                      ? AssetImage(_pista!.imagenUrl!) as ImageProvider
+                                      : NetworkImage(_pista!.imagenUrl!),
                                   fit: BoxFit.cover,
                                 )
                               : null,
                         ),
-                        child: _pista!.imagenUrl == null ||
-                                _pista!.imagenUrl!.isEmpty
+                        child: _pista!.imagenUrl == null || _pista!.imagenUrl!.isEmpty
                             ? const Center(
                                 child: Icon(
                                   Icons.sports_soccer,

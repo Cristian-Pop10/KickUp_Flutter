@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_application/src/vista/partidos_view.dart';
+import 'package:kickup/src/vista/partidos_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../modelo/signup_model.dart';
 import '../modelo/user_model.dart';
@@ -164,4 +164,9 @@ class AuthController {
       return false;
     }
   }
+
+  Future<String?> getProfileImageUrl(String userId) async {
+  final doc = await FirebaseFirestore.instance.collection('usuarios').doc(userId).get();
+  return doc.data()?['profileImageUrl'] as String?;
+}
 }

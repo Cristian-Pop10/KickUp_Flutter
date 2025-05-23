@@ -7,6 +7,7 @@ import 'detalle_pista_view.dart';
 import 'equipos_view.dart';
 import 'partidos_view.dart';
 import 'perfil_view.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class PistasView extends StatefulWidget {
   final String userId;
@@ -23,6 +24,7 @@ class _PistasViewState extends State<PistasView> {
   bool _isLoading = true;
   bool _mostrarMapa = false;
   Set<Marker> _markers = {};
+  bool _mapInitialized = false;
   
   // Controlador para el mapa
   GoogleMapController? _mapController;
@@ -33,6 +35,7 @@ class _PistasViewState extends State<PistasView> {
   @override
   void initState() {
     super.initState();
+    _requestLocationPermission();
     _cargarPistas();
   }
   
@@ -41,6 +44,13 @@ class _PistasViewState extends State<PistasView> {
     _mapController?.dispose();
     super.dispose();
   }
+
+  Future<void> _requestLocationPermission() async {
+  var status = await Permission.location.status;
+  if (!status.isGranted) {
+    await Permission.location.request();
+  }
+}
 
   Future<void> _cargarPistas() async {
     setState(() {
@@ -174,7 +184,7 @@ class _PistasViewState extends State<PistasView> {
                             _mostrarMapa = !_mostrarMapa;
                           });
                         },
-                        tooltip: _mostrarMapa ? 'Ver lista' : 'Ver mapa',
+                        tooltip: _mostrarMapa ? 'Ver mapa' : 'Ver lista',
                         padding: const EdgeInsets.all(8),
                         constraints: const BoxConstraints(), // Eliminar restricciones de tamaño
                       ),
@@ -264,28 +274,54 @@ class _PistasViewState extends State<PistasView> {
   }
 
   Widget _buildMapa() {
-    return GoogleMap(
-      initialCameraPosition: const CameraPosition(
-        target: LatLng(40.416775, -3.703790), // Madrid por defecto
-        zoom: 12,
-      ),
-      markers: _markers,
-      myLocationEnabled: true,
-      myLocationButtonEnabled: true,
-      mapType: MapType.normal,
-      onMapCreated: (controller) {
-        _mapController = controller;
+    // Coordenadas por defecto (Madrid)
+    const LatLng defaultLocation = LatLng(40.416775, -3.703790);
+    
+    // Usar la primera pista como ubicación inicial si está disponible
+    LatLng initialLocation = _pistas.isNotEmpty 
+        ? LatLng(_pistas.first.latitud, _pistas.first.longitud)
+        : defaultLocation;
+    
+    return Stack(
+      children: [
+        GoogleMap(
+          initialCameraPosition: CameraPosition(
+            target: initialLocation,
+            zoom: 12,
+          ),
+          markers: _markers,
+          myLocationEnabled: true,
+          myLocationButtonEnabled: true,
+          mapType: MapType.normal,
+          zoomControlsEnabled: true,
+          compassEnabled: true,
+          onMapCreated: (GoogleMapController controller) {
+            setState(() {
+              _mapController = controller;
+              _mapInitialized = true;
+            });
+            
+            // Centrar el mapa en la primera pista si hay pistas disponibles
+            if (_pistas.isNotEmpty) {
+              controller.animateCamera(
+                CameraUpdate.newLatLngZoom(
+                  LatLng(_pistas.first.latitud, _pistas.first.longitud),
+                  12,
+                ),
+              );
+            }
+            
+            // Imprimir mensaje de depuración
+            print('Mapa creado correctamente');
+          },
+        ),
         
-        // Si hay pistas, centrar el mapa en la primera
-        if (_pistas.isNotEmpty) {
-          _mapController?.animateCamera(
-            CameraUpdate.newLatLngZoom(
-              LatLng(_pistas.first.latitud, _pistas.first.longitud),
-              12,
-            ),
-          );
-        }
-      },
+        // Indicador de carga mientras el mapa se inicializa
+        if (!_mapInitialized)
+          const Center(
+            child: CircularProgressIndicator(),
+          ),
+      ],
     );
   }
 
@@ -313,7 +349,9 @@ class _PistasViewState extends State<PistasView> {
                   borderRadius: BorderRadius.circular(8),
                   image: pista.imagenUrl != null && pista.imagenUrl!.isNotEmpty
                       ? DecorationImage(
-                          image: NetworkImage(pista.imagenUrl!),
+                          image: pista.imagenUrl!.startsWith('assets/')
+                              ? AssetImage(pista.imagenUrl!) as ImageProvider
+                              : NetworkImage(pista.imagenUrl!),
                           fit: BoxFit.cover,
                         )
                       : null,
