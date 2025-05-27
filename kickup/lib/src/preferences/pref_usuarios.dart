@@ -20,11 +20,6 @@ class PreferenciasUsuario {
 
   static set userEmail(String value) => _prefs.setString('user_email', value);
 
-  // ID del usuario
-  static String get userId => _prefs.getString('user_id') ?? '';
-
-  static set userId(String value) => _prefs.setString('user_id', value);
-
   // Nombre del usuario
   static String get userName => _prefs.getString('user_name') ?? '';
 

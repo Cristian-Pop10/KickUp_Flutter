@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../componentes/bottom_nav_bar.dart';
@@ -10,9 +11,8 @@ import 'perfil_view.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class PistasView extends StatefulWidget {
-  final String userId;
 
-  const PistasView({Key? key, required this.userId}) : super(key: key);
+  const PistasView({Key? key,}) : super(key: key);
 
   @override
   _PistasViewState createState() => _PistasViewState();
@@ -31,10 +31,13 @@ class _PistasViewState extends State<PistasView> {
   
   // Índice actual para el BottomNavBar (2 para la pestaña de pistas)
   final int _currentIndex = 2;
+
+  late final String? userId;
   
   @override
   void initState() {
     super.initState();
+    userId = FirebaseAuth.instance.currentUser?.uid;
     _requestLocationPermission();
     _cargarPistas();
   }
@@ -101,7 +104,7 @@ class _PistasViewState extends State<PistasView> {
       MaterialPageRoute(
         builder: (context) => DetallePistaView(
           pistaId: pistaId,
-          userId: widget.userId,
+          userId: userId!,
         ),
       ),
     );
@@ -118,15 +121,15 @@ class _PistasViewState extends State<PistasView> {
     
     switch (index) {
       case 0:
-        nextScreen = PartidosView(userId: widget.userId);
+        nextScreen = PartidosView();
         break;
       case 1:
-        nextScreen = EquiposView(userId: widget.userId);
+        nextScreen = EquiposView();
         break;
       case 2:
         return; // Ya estamos en la pestaña de pistas
       case 3:
-        nextScreen = PerfilView(userId: widget.userId);
+        nextScreen = PerfilView();
         break;
       default:
         return;

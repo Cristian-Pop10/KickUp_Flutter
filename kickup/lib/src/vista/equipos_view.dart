@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:kickup/src/vista/crear_equipo_view.dart';
 import '../controlador/equipo_controller.dart';
@@ -8,11 +9,9 @@ import '../controlador/auth_controller.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class EquiposView extends StatefulWidget {
-  final String userId;
 
   const EquiposView({
     Key? key,
-    required this.userId,
   }) : super(key: key);
 
   @override
@@ -26,11 +25,13 @@ class _EquiposViewState extends State<EquiposView> {
   List<EquipoModel> _equipos = [];
   List<EquipoModel> _equiposFiltrados = [];
   bool _isLoading = true;
+  late final String? userId;
 
   @override
   void initState() {
     super.initState();
     _searchController.addListener(_filtrarEquipos);
+    userId = FirebaseAuth.instance.currentUser?.uid;
     _cargarEquipos();
   }
 
@@ -68,7 +69,7 @@ class _EquiposViewState extends State<EquiposView> {
       MaterialPageRoute(
         builder: (context) => DetalleEquipoView(
           equipoId: equipoId,
-          userId: widget.userId,
+          userId: userId!,
         ),
       ),
     );
@@ -77,7 +78,7 @@ class _EquiposViewState extends State<EquiposView> {
   void _navegarACrearEquipo() async {
     final result = await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => CrearEquipoView(userId: widget.userId),
+        builder: (context) => CrearEquipoView(userId: userId!),
       ),
     );
 
@@ -111,7 +112,7 @@ class _EquiposViewState extends State<EquiposView> {
                   StreamBuilder<DocumentSnapshot>(
                     stream: FirebaseFirestore.instance
                         .collection('usuarios')
-                        .doc(widget.userId)
+                        .doc(userId)
                         .snapshots(),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
@@ -123,7 +124,8 @@ class _EquiposViewState extends State<EquiposView> {
                       }
                       String? imageUrl;
                       if (snapshot.hasData && snapshot.data!.data() != null) {
-                        final data = snapshot.data!.data() as Map<String, dynamic>;
+                        final data =
+                            snapshot.data!.data() as Map<String, dynamic>;
                         imageUrl = data['profileImageUrl'] as String?;
                       }
                       return GestureDetector(
@@ -133,9 +135,13 @@ class _EquiposViewState extends State<EquiposView> {
                         child: CircleAvatar(
                           radius: 20,
                           backgroundColor: Colors.grey[300],
-                          backgroundImage: (imageUrl != null && imageUrl.isNotEmpty)
-                              ? NetworkImage(imageUrl)
-                              : const AssetImage('assets/profile.jpg') as ImageProvider,
+                          backgroundImage:
+                              (imageUrl != null && imageUrl.isNotEmpty)
+                                  ? NetworkImage(imageUrl)
+                                  : null,
+                          child: (imageUrl == null || imageUrl.isEmpty)
+                              ? const Icon(Icons.person, color: Colors.white)
+                              : null,
                         ),
                       );
                     },
@@ -171,7 +177,7 @@ class _EquiposViewState extends State<EquiposView> {
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: SizedBox(
                 width: double.infinity,
-                height: 50,
+                height: 40,
                 child: ElevatedButton(
                   onPressed: _navegarACrearEquipo,
                   style: ElevatedButton.styleFrom(
@@ -284,19 +290,27 @@ class _EquipoCard extends StatelessWidget {
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(15),
-              child: Image.asset(
-                logoUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return const Center(
-                    child: Icon(
-                      Icons.sports_soccer,
-                      size: 50,
-                      color: Colors.grey,
+              child: (logoUrl.isNotEmpty)
+                  ? Image.network(
+                      logoUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Center(
+                          child: Icon(
+                            Icons.sports_soccer,
+                            size: 50,
+                            color: Colors.grey,
+                          ),
+                        );
+                      },
+                    )
+                  : const Center(
+                      child: Icon(
+                        Icons.sports_soccer,
+                        size: 50,
+                        color: Colors.grey,
+                      ),
                     ),
-                  );
-                },
-              ),
             ),
           ),
           const SizedBox(height: 8),

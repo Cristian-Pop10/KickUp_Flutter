@@ -61,7 +61,7 @@ class AuthController {
         // Obtener el ID del usuario después de un login exitoso
         final user = FirebaseAuth.instance.currentUser;
         final userId = user?.uid ?? '';
-        
+
         // Guardar el ID del usuario en SharedPreferences
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('user_id', userId);
@@ -90,17 +90,16 @@ class AuthController {
   void navigateToPartidos(BuildContext context, String userId) {
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (context) => PartidosView(userId: userId),
+        builder: (context) => PartidosView(),
       ),
     );
   }
 
   // Método para navegar a la pantalla de perfil
   void navigateToPerfil(BuildContext context) {
-    final userId = _authService.getCurrentUserId() ?? '';
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => PerfilView(userId: userId),
+        builder: (context) => PerfilView(),
       ),
     );
   }
@@ -140,7 +139,8 @@ class AuthController {
   Future<bool> registerWithUser(UserModel user) async {
     try {
       // 1. Registrar en Firebase Auth
-      final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      final credential =
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: user.email,
         password: user.password ?? '',
       );
@@ -166,7 +166,10 @@ class AuthController {
   }
 
   Future<String?> getProfileImageUrl(String userId) async {
-  final doc = await FirebaseFirestore.instance.collection('usuarios').doc(userId).get();
-  return doc.data()?['profileImageUrl'] as String?;
-}
+    final doc = await FirebaseFirestore.instance
+        .collection('usuarios')
+        .doc(userId)
+        .get();
+    return doc.data()?['profileImageUrl'] as String?;
+  }
 }

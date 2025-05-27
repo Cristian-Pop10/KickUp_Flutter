@@ -1,7 +1,7 @@
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import '../controlador/equipo_controller.dart';
-import '../modelo/equipo_model.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:io';
 
 class CrearEquipoView extends StatefulWidget {
@@ -18,19 +18,23 @@ class CrearEquipoView extends StatefulWidget {
 
 class _CrearEquipoViewState extends State<CrearEquipoView> {
   final _formKey = GlobalKey<FormState>();
-  final EquipoController _equipoController = EquipoController();
-  
+
   // Controladores para los campos de texto
   final TextEditingController _nombreController = TextEditingController();
   final TextEditingController _tipoController = TextEditingController();
   final TextEditingController _descripcionController = TextEditingController();
   final TextEditingController _nivelController = TextEditingController();
-  
+
   // Variables para almacenar los valores seleccionados
   File? _logoImage;
   bool _isLoading = false;
   String _tipoSeleccionado = 'Fútbol 7';
-  final List<String> _tiposEquipo = ['Fútbol 5', 'Fútbol 7', 'Fútbol 11', 'Fútbol Sala'];
+  final List<String> _tiposEquipo = [
+    'Fútbol 5',
+    'Fútbol 7',
+    'Fútbol 11',
+    'Fútbol Sala'
+  ];
 
   @override
   void dispose() {
@@ -51,6 +55,13 @@ class _CrearEquipoViewState extends State<CrearEquipoView> {
         _logoImage = File(image.path);
       });
     }
+  }
+
+  Future<String?> subirLogoEquipo(File logo, String equipoId) async {
+    final storageRef =
+        FirebaseStorage.instance.ref().child('equipos').child('$equipoId.jpg');
+    final uploadTask = await storageRef.putFile(logo);
+    return await uploadTask.ref.getDownloadURL();
   }
 
   // Método para mostrar el selector de tipo de equipo
@@ -81,6 +92,7 @@ class _CrearEquipoViewState extends State<CrearEquipoView> {
   }
 
   // Método para guardar el equipo
+  // ...existing code...
   Future<void> _guardarEquipo() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
@@ -88,29 +100,53 @@ class _CrearEquipoViewState extends State<CrearEquipoView> {
       });
 
       try {
-        // Crear el modelo de equipo
-        final nuevoEquipo = EquipoModel(
-          id: 'equipo_${DateTime.now().millisecondsSinceEpoch}',
-          nombre: _nombreController.text,
-          tipo: _tipoSeleccionado,
-          logoUrl: '', // URL de la imagen (se puede subir después)
-          descripcion: _descripcionController.text,
-          jugadoresIds: [widget.userId], // El creador es el primer miembro
-          nivel: int.tryParse(_nivelController.text) ?? 1,
-        );
+        // 1. Genera el ID del equipo
+        final equipoId = 'equipo_${DateTime.now().millisecondsSinceEpoch}';
 
-        // Guardar el equipo
-        final resultado = await _equipoController.crearEquipo(nuevoEquipo , widget.userId);
+        // 2. Sube el logo si existe
+        String logoUrl = '';
+        if (_logoImage != null) {
+          logoUrl = await subirLogoEquipo(_logoImage!, equipoId) ?? '';
+        }
 
-        if (resultado && mounted) {
+        // 3. Obtén los datos del usuario creador
+        final usuarioDoc = await FirebaseFirestore.instance
+            .collection('usuarios')
+            .doc(widget.userId)
+            .get();
+        final userData = usuarioDoc.data();
+
+        // 4. Crea el modelo/mapa de equipo con jugadores y jugadoresIds
+        final equipoMap = {
+          'id': equipoId,
+          'nombre': _nombreController.text,
+          'tipo': _tipoSeleccionado,
+          'logoUrl': logoUrl,
+          'descripcion': _descripcionController.text,
+          'nivel': int.tryParse(_nivelController.text) ?? 1,
+          'jugadoresIds': [widget.userId],
+          'jugadores': [
+            {
+              'id': widget.userId,
+              'nombre': userData?['nombre'] ?? '',
+              'apellidos': userData?['apellidos'] ?? '',
+              'posicion': userData?['posicion'] ?? '',
+              'profileImageUrl': userData?['profileImageUrl'] ?? '',
+            }
+          ],
+        };
+
+        // 5. Guarda el equipo en Firestore
+        await FirebaseFirestore.instance
+            .collection('equipos')
+            .doc(equipoId)
+            .set(equipoMap);
+
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Equipo creado correctamente')),
           );
-          Navigator.pop(context, true); // Volver a la pantalla anterior con resultado positivo
-        } else if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Error al crear el equipo')),
-          );
+          Navigator.pop(context, true);
         }
       } catch (e) {
         if (mounted) {
@@ -169,7 +205,7 @@ class _CrearEquipoViewState extends State<CrearEquipoView> {
                         ),
                       ),
                       const SizedBox(height: 30),
-                      
+
                       // Logo del equipo
                       Center(
                         child: GestureDetector(
@@ -209,7 +245,7 @@ class _CrearEquipoViewState extends State<CrearEquipoView> {
                         ),
                       ),
                       const SizedBox(height: 30),
-                      
+
                       // Campo Nombre
                       const Text(
                         'Nombre del equipo',
@@ -231,7 +267,7 @@ class _CrearEquipoViewState extends State<CrearEquipoView> {
                         },
                       ),
                       const SizedBox(height: 20),
-                      
+
                       // Campo Tipo
                       const Text(
                         'Tipo',
@@ -256,7 +292,7 @@ class _CrearEquipoViewState extends State<CrearEquipoView> {
                         },
                       ),
                       const SizedBox(height: 20),
-                      
+
                       // Campo Nivel
                       const Text(
                         'Nivel',
@@ -283,7 +319,7 @@ class _CrearEquipoViewState extends State<CrearEquipoView> {
                         },
                       ),
                       const SizedBox(height: 20),
-                      
+
                       // Campo Descripción
                       const Text(
                         'Descripción',
@@ -296,7 +332,8 @@ class _CrearEquipoViewState extends State<CrearEquipoView> {
                       const SizedBox(height: 8),
                       Container(
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE8DDBD), // Color beige claro para los campos
+                          color: const Color(
+                              0xFFE8DDBD), // Color beige claro para los campos
                           borderRadius: BorderRadius.circular(15),
                         ),
                         child: TextFormField(
@@ -306,7 +343,8 @@ class _CrearEquipoViewState extends State<CrearEquipoView> {
                             hintText: 'Describe tu equipo',
                             hintStyle: TextStyle(color: Colors.black54),
                             border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                            contentPadding: EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 15),
                           ),
                           style: const TextStyle(
                             fontSize: 16,
@@ -315,7 +353,7 @@ class _CrearEquipoViewState extends State<CrearEquipoView> {
                         ),
                       ),
                       const SizedBox(height: 40),
-                      
+
                       // Botón Guardar
                       SizedBox(
                         width: double.infinity,
@@ -369,7 +407,8 @@ class _CrearEquipoViewState extends State<CrearEquipoView> {
           hintText: hintText,
           hintStyle: const TextStyle(color: Colors.black54),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
           suffixIcon: suffixIcon,
         ),
         style: const TextStyle(

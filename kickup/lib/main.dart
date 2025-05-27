@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -28,9 +29,14 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
 
-  final storedUserId = PreferenciasUsuario.userId;
-  final isAuthenticated = storedUserId.isNotEmpty;
-  final userId = storedUserId.isNotEmpty ? storedUserId : 'user_id';
+final currentUser = FirebaseAuth.instance.currentUser;
+final isAuthenticated = currentUser != null;
+final userId = currentUser?.uid ?? '';
+
+runApp(MyApp(
+  isAuthenticated: isAuthenticated,
+  userId: userId,
+));
 
   runApp(MyApp(
     isAuthenticated: isAuthenticated,
@@ -103,19 +109,19 @@ class MyApp extends StatelessWidget {
           );
         } else if (settings.name == '/partidos') {
           return MaterialPageRoute(
-            builder: (context) => PartidosView(userId: userIdToUse),
+            builder: (context) => PartidosView(),
           );
         } else if (settings.name == '/equipos') {
           return MaterialPageRoute(
-            builder: (context) => EquiposView(userId: userIdToUse),
+            builder: (context) => EquiposView(),
           );
         } else if (settings.name == '/pistas') {
           return MaterialPageRoute(
-            builder: (context) => PistasView(userId: userIdToUse),
+            builder: (context) => PistasView(),
           );
         } else if (settings.name == '/perfil') {
           return MaterialPageRoute(
-            builder: (context) => PerfilView(userId: userIdToUse), 
+            builder: (context) => PerfilView(), 
           );
         } else if (settings.name!.startsWith('/detalle-partido/')) {
           final partidoId = settings.name!.split('/').last;
@@ -144,7 +150,7 @@ class MyApp extends StatelessWidget {
         }
         return MaterialPageRoute(
           builder: (context) =>
-              isAuthenticated ? PartidosView(userId: userIdToUse) : LogInPage(),
+              isAuthenticated ? PartidosView() : LogInPage(),
         );
       },
     );

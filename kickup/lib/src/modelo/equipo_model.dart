@@ -1,5 +1,6 @@
 class EquipoModel {
   final String id;
+  final String creadorId;
   final String nombre;
   final String tipo;
   final String logoUrl;
@@ -9,6 +10,7 @@ class EquipoModel {
 
   EquipoModel({
     required this.id,
+    required this.creadorId,
     required this.nombre,
     required this.tipo,
     required this.logoUrl,
@@ -20,6 +22,7 @@ class EquipoModel {
   // Constructor de copia con parámetros opcionales
   EquipoModel copyWith({
     String? id,
+    String? creadorId,
     String? nombre,
     String? tipo,
     String? logoUrl,
@@ -29,6 +32,7 @@ class EquipoModel {
   }) {
     return EquipoModel(
       id: id ?? this.id,
+      creadorId: this.creadorId, // El creadorId no se debe cambiar
       nombre: nombre ?? this.nombre,
       tipo: tipo ?? this.tipo,
       logoUrl: logoUrl ?? this.logoUrl,
@@ -42,6 +46,7 @@ class EquipoModel {
   factory EquipoModel.fromJson(Map<String, dynamic> json) {
     return EquipoModel(
       id: json['id'],
+      creadorId: json['creadorId'] ?? '', 
       nombre: json['nombre'],
       tipo: json['tipo'],
       logoUrl: json['logoUrl'],
@@ -55,6 +60,7 @@ class EquipoModel {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'creadorId': creadorId,
       'nombre': nombre,
       'tipo': tipo,
       'logoUrl': logoUrl,

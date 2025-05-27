@@ -40,7 +40,6 @@ class _LogInPageState extends State<LogInPage> {
         
         // Guardar información del usuario en preferencias
         PreferenciasUsuario.userEmail = email;
-        PreferenciasUsuario.userId = userId;
         PreferenciasUsuario.ultimaPagina = '/partidos';
         
         print('✅ Sesión guardada con ID de usuario: $userId');
@@ -68,7 +67,7 @@ class _LogInPageState extends State<LogInPage> {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (context) => PartidosView(userId: userId),
+              builder: (context) => PartidosView(),
             ),
           );
         }

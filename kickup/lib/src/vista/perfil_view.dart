@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:kickup/src/controlador/auth_controller.dart';
 import 'dart:io';
@@ -6,9 +7,8 @@ import 'package:kickup/src/controlador/perfil_controller.dart';
 import 'package:kickup/src/modelo/user_model.dart';
 
 class PerfilView extends StatefulWidget {
-  final String userId;
 
-  const PerfilView({Key? key, required this.userId}) : super(key: key);
+  const PerfilView({Key? key, }) : super(key: key);
 
   @override
   State<PerfilView> createState() => _PerfilViewState();
@@ -37,16 +37,19 @@ class _PerfilViewState extends State<PerfilView> {
   final TextEditingController _nivelController = TextEditingController();
   final TextEditingController _telefonoController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
-  
+
   // Variable para almacenar la posición seleccionada
   String? _posicionSeleccionada;
 
   // Color para los campos de formulario en modo edición
   final Color _formFieldColor = Colors.white;
 
+  late final String? userId; 
+
   @override
   void initState() {
     super.initState();
+    userId = FirebaseAuth.instance.currentUser?.uid;
     _cargarUsuario();
   }
 
@@ -85,17 +88,19 @@ class _PerfilViewState extends State<PerfilView> {
         _apellidosController.text = usuario.apellidos ?? '';
         _edadController.text = usuario.edad?.toString() ?? '';
         _nivelController.text = usuario.nivel?.toString() ?? '';
-        
+
         // Asegurarse de que la posición esté en minúsculas para coincidir con la lista
         _posicionSeleccionada = usuario.posicion?.toLowerCase();
-        
+
         // Verificar que la posición seleccionada esté en la lista
-        if (_posicionSeleccionada != null && !_posiciones.contains(_posicionSeleccionada)) {
-          _posicionSeleccionada = null; // Si no está en la lista, establecer como nulo
+        if (_posicionSeleccionada != null &&
+            !_posiciones.contains(_posicionSeleccionada)) {
+          _posicionSeleccionada =
+              null; // Si no está en la lista, establecer como nulo
         }
-        
+
         _telefonoController.text = usuario.telefono ?? '';
-        _emailController.text = usuario.email ?? '';
+        _emailController.text = usuario.email;
       }
     });
   }
@@ -137,7 +142,8 @@ class _PerfilViewState extends State<PerfilView> {
       email: _emailController.text.trim(),
     );
 
-    final success = await _perfilController.actualizarPerfil(usuarioActualizado);
+    final success =
+        await _perfilController.actualizarPerfil(usuarioActualizado);
 
     if (mounted) {
       if (success) {
@@ -218,11 +224,13 @@ class _PerfilViewState extends State<PerfilView> {
               ),
               const SizedBox(height: 16),
               ListTile(
-                leading: const Icon(Icons.photo_library, color: Color(0xFF5A9A7A)),
+                leading:
+                    const Icon(Icons.photo_library, color: Color(0xFF5A9A7A)),
                 title: const Text('Elegir de la galería'),
                 onTap: () async {
                   Navigator.of(context).pop();
-                  final imagen = await _perfilController.seleccionarImagenGaleria();
+                  final imagen =
+                      await _perfilController.seleccionarImagenGaleria();
                   if (imagen != null) {
                     await _subirYActualizarFoto(imagen);
                   }
@@ -239,7 +247,8 @@ class _PerfilViewState extends State<PerfilView> {
                   }
                 },
               ),
-              if (_usuario?.profileImageUrl != null && _usuario!.profileImageUrl!.isNotEmpty)
+              if (_usuario?.profileImageUrl != null &&
+                  _usuario!.profileImageUrl!.isNotEmpty)
                 ListTile(
                   leading: const Icon(Icons.delete, color: Colors.red),
                   title: const Text('Eliminar foto actual'),
@@ -285,7 +294,8 @@ class _PerfilViewState extends State<PerfilView> {
         ),
       );
 
-      final exito = await _perfilController.actualizarFotoPerfil(imagen, _usuario!.id!);
+      final exito =
+          await _perfilController.actualizarFotoPerfil(imagen, _usuario!.id!);
 
       // Cerrar diálogo de progreso
       if (mounted) {
@@ -306,7 +316,8 @@ class _PerfilViewState extends State<PerfilView> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('No se pudo actualizar la foto. Inténtalo de nuevo.'),
+              content:
+                  Text('No se pudo actualizar la foto. Inténtalo de nuevo.'),
               backgroundColor: Colors.red,
             ),
           );
@@ -314,12 +325,12 @@ class _PerfilViewState extends State<PerfilView> {
       }
     } catch (e) {
       print('Error al subir imagen: $e');
-      
+
       // Cerrar diálogo de progreso si está abierto
       if (mounted && Navigator.of(context).canPop()) {
         Navigator.of(context).pop();
       }
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -342,7 +353,7 @@ class _PerfilViewState extends State<PerfilView> {
 
     try {
       final success = await _perfilController.eliminarFotoPerfil(_usuario!.id!);
-      
+
       if (success) {
         await _cargarUsuario();
         if (mounted) {
@@ -353,7 +364,8 @@ class _PerfilViewState extends State<PerfilView> {
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Error al eliminar la foto de perfil')),
+            const SnackBar(
+                content: Text('Error al eliminar la foto de perfil')),
           );
         }
       }
@@ -416,7 +428,9 @@ class _PerfilViewState extends State<PerfilView> {
                             children: [
                               const SizedBox(height: 20),
                               GestureDetector(
-                                onTap: _isUploadingImage ? null : _mostrarOpcionesImagen,
+                                onTap: _isUploadingImage
+                                    ? null
+                                    : _mostrarOpcionesImagen,
                                 child: Stack(
                                   children: [
                                     _isUploadingImage
@@ -427,10 +441,23 @@ class _PerfilViewState extends State<PerfilView> {
                                           )
                                         : CircleAvatar(
                                             radius: 60,
-                                            backgroundImage: _usuario!.profileImageUrl != null && _usuario!.profileImageUrl!.isNotEmpty
-                                                ? CachedNetworkImageProvider(_usuario!.profileImageUrl!)
-                                                : const AssetImage('assets/profile.jpg') as ImageProvider,
                                             backgroundColor: Colors.grey,
+                                            backgroundImage: (_usuario!
+                                                            .profileImageUrl !=
+                                                        null &&
+                                                    _usuario!.profileImageUrl!
+                                                        .isNotEmpty)
+                                                ? CachedNetworkImageProvider(
+                                                    _usuario!.profileImageUrl!)
+                                                : null, // Sin imagen si no hay URL
+                                            child: (_usuario!.profileImageUrl ==
+                                                        null ||
+                                                    _usuario!.profileImageUrl!
+                                                        .isEmpty)
+                                                ? const Icon(Icons.person,
+                                                    size: 60,
+                                                    color: Colors.white)
+                                                : null,
                                           ),
                                     if (!_isUploadingImage)
                                       Positioned(
@@ -456,11 +483,9 @@ class _PerfilViewState extends State<PerfilView> {
                                   ],
                                 ),
                               ),
+                              if (!_isUploadingImage) const SizedBox(height: 8),
                               if (!_isUploadingImage)
-                                const SizedBox(height: 8),
-                              if (!_isUploadingImage)
-                               
-                              const SizedBox(height: 16),
+                                const SizedBox(height: 16),
                               _isEditing
                                   ? Column(
                                       children: [
@@ -471,7 +496,11 @@ class _PerfilViewState extends State<PerfilView> {
                                             border: const OutlineInputBorder(),
                                             filled: true,
                                             fillColor: _formFieldColor,
-                                            errorText: _nombreController.text.trim().isEmpty ? 'Campo obligatorio' : null,
+                                            errorText: _nombreController.text
+                                                    .trim()
+                                                    .isEmpty
+                                                ? 'Campo obligatorio'
+                                                : null,
                                           ),
                                         ),
                                         const SizedBox(height: 8),
@@ -511,13 +540,20 @@ class _PerfilViewState extends State<PerfilView> {
                                     _isEditing = !_isEditing;
                                     if (!_isEditing) {
                                       // Si estábamos editando y cancelamos, restauramos los valores originales
-                                      _nombreController.text = _usuario!.nombre ?? '';
-                                      _apellidosController.text = _usuario!.apellidos ?? '';
-                                      _edadController.text = _usuario!.edad?.toString() ?? '';
-                                      _nivelController.text = _usuario!.nivel?.toString() ?? '';
-                                      _posicionSeleccionada = _usuario!.posicion?.toLowerCase();
-                                      _telefonoController.text = _usuario!.telefono ?? '';
-                                      _emailController.text = _usuario!.email ?? '';
+                                      _nombreController.text =
+                                          _usuario!.nombre ?? '';
+                                      _apellidosController.text =
+                                          _usuario!.apellidos ?? '';
+                                      _edadController.text =
+                                          _usuario!.edad?.toString() ?? '';
+                                      _nivelController.text =
+                                          _usuario!.nivel?.toString() ?? '';
+                                      _posicionSeleccionada =
+                                          _usuario!.posicion?.toLowerCase();
+                                      _telefonoController.text =
+                                          _usuario!.telefono ?? '';
+                                      _emailController.text =
+                                          _usuario!.email;
                                     }
                                   });
                                 },
@@ -550,7 +586,7 @@ class _PerfilViewState extends State<PerfilView> {
                               ),
                               const SizedBox(height: 16),
                               _buildInfoField(
-                                'Nivel',
+                                'Nivel (1-5)',
                                 _usuario!.nivel?.toString() ?? '',
                                 _nivelController,
                                 keyboardType: TextInputType.number,
@@ -567,7 +603,7 @@ class _PerfilViewState extends State<PerfilView> {
                               const SizedBox(height: 16),
                               _buildInfoField(
                                 'Email',
-                                _usuario!.email ?? '',
+                                _usuario!.email,
                                 _emailController,
                                 keyboardType: TextInputType.emailAddress,
                                 isRequired: true,
@@ -582,7 +618,8 @@ class _PerfilViewState extends State<PerfilView> {
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: const Color(0xFF5A9A7A),
                                       foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(vertical: 16),
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 16),
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(30),
                                       ),
@@ -725,7 +762,8 @@ class _PerfilViewState extends State<PerfilView> {
                 ),
                 child: Text(
                   _usuario!.posicion != null && _usuario!.posicion!.isNotEmpty
-                      ? _usuario!.posicion![0].toUpperCase() + _usuario!.posicion!.substring(1)
+                      ? _usuario!.posicion![0].toUpperCase() +
+                          _usuario!.posicion!.substring(1)
                       : '',
                   style: const TextStyle(
                     fontSize: 16,

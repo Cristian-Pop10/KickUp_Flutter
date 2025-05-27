@@ -3,6 +3,7 @@ import 'package:kickup/src/controlador/auth_controller.dart';
 import 'package:kickup/src/controlador/partido_controller.dart';
 import 'package:kickup/src/modelo/partido_model.dart';
 import 'package:kickup/src/servicio/user_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class DetallePartidoView extends StatefulWidget {
   final String partidoId;
@@ -363,39 +364,110 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
 
                               const SizedBox(height: 16),
 
-                              // Lista de jugadores (simulada)
-                              ListView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                itemCount: _partido!.jugadores.length,
-                                itemBuilder: (context, index) {
-                                  final jugador = _partido!.jugadores[index];
-                                  return ListTile(
-                                    leading: FutureBuilder<String?>(
-                                      future: widget.authController
-                                          .getProfileImageUrl(widget.userId),
-                                      builder: (context, snapshot) {
-                                        final imageUrl = snapshot.data;
-                                        return CircleAvatar(
-                                          radius: 20,
-                                          backgroundImage: (imageUrl != null &&
-                                                  imageUrl.isNotEmpty)
-                                              ? NetworkImage(imageUrl)
-                                              : const AssetImage(
-                                                  'assets/profile.jpg')
-                                                  as ImageProvider,
+                              // Lista de jugadores
+                              StreamBuilder<DocumentSnapshot>(
+                                stream: FirebaseFirestore.instance
+                                    .collection('partidos')
+                                    .doc(widget.partidoId)
+                                    .snapshots(),
+                                builder: (context, snapshot) {
+                                  if (!snapshot.hasData ||
+                                      snapshot.data!.data() == null) {
+                                    return const Center(
+                                        child: CircularProgressIndicator());
+                                  }
+
+                                  final data = snapshot.data!.data()
+                                      as Map<String, dynamic>;
+                                  final jugadores =
+                                      List<Map<String, dynamic>>.from(
+                                          data['jugadores'] ?? []);
+
+                                  if (jugadores.isEmpty) {
+                                    return const Text(
+                                        'No hay jugadores inscritos.');
+                                  }
+
+                                  return ListView.builder(
+                                    shrinkWrap: true,
+                                    physics:
+                                        const NeverScrollableScrollPhysics(),
+                                    itemCount: jugadores.length,
+                                    itemBuilder: (context, index) {
+                                      final jugador = jugadores[index];
+                                      final jugadorId =
+                                          jugador['id'] as String?;
+
+                                      if (jugadorId == null) {
+                                        return const ListTile(
+                                          title: Text('Jugador no válido'),
                                         );
-                                      },
-                                    ),
-                                    title: Text(
-                                      '${jugador.nombre} ${jugador.apellidos}',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    subtitle: Text(
-                                      jugador.posicion ?? 'Sin posición',
-                                    ),
+                                      }
+
+                                      return StreamBuilder<DocumentSnapshot>(
+                                        stream: FirebaseFirestore.instance
+                                            .collection('usuarios')
+                                            .doc(jugadorId)
+                                            .snapshots(),
+                                        builder: (context, userSnapshot) {
+                                          if (userSnapshot.connectionState ==
+                                              ConnectionState.waiting) {
+                                            return const ListTile(
+                                                title: Text(
+                                                    'Cargando jugador...'));
+                                          }
+
+                                          if (userSnapshot.hasError) {
+                                            return const ListTile(
+                                                title: Text(
+                                                    'Error al cargar jugador'));
+                                          }
+
+                                          if (!userSnapshot.hasData ||
+                                              userSnapshot.data!.data() ==
+                                                  null) {
+                                            return const ListTile(
+                                                title: Text(
+                                                    'Jugador no encontrado'));
+                                          }
+
+                                          final userData = userSnapshot.data!
+                                              .data() as Map<String, dynamic>;
+                                          final imageUrl =
+                                              userData['profileImageUrl']
+                                                  as String?;
+                                          final nombre =
+                                              userData['nombre'] ?? '';
+                                          final apellidos =
+                                              userData['apellidos'] ?? '';
+                                          final posicion =
+                                              userData['posicion'] ??
+                                                  'Sin posición';
+
+                                          return ListTile(
+                                            leading: CircleAvatar(
+                                              radius: 20,
+                                              backgroundImage:
+                                                  (imageUrl != null &&
+                                                          imageUrl.isNotEmpty)
+                                                      ? NetworkImage(imageUrl)
+                                                      : null,
+                                              child: (imageUrl == null ||
+                                                      imageUrl.isEmpty)
+                                                  ? const Icon(Icons.person,
+                                                      color: Colors.white)
+                                                  : null,
+                                            ),
+                                            title: Text(
+                                              '$nombre $apellidos',
+                                              style: const TextStyle(
+                                                  fontWeight: FontWeight.bold),
+                                            ),
+                                            subtitle: Text(posicion),
+                                          );
+                                        },
+                                      );
+                                    },
                                   );
                                 },
                               ),

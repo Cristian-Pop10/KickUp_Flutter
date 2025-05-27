@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:kickup/src/controlador/auth_controller.dart';
 import 'package:kickup/src/controlador/partido_controller.dart';
@@ -8,11 +9,9 @@ import '../componentes/bottom_nav_bar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class PartidosView extends StatefulWidget {
-  final String userId;
 
   const PartidosView({
     Key? key,
-    required this.userId,
   }) : super(key: key);
 
   @override
@@ -29,10 +28,12 @@ class _PartidosViewState extends State<PartidosView> {
   bool _isSearching = false;
   final List<Widget> _screens = []; // Aquí puedes definir las pantallas
   int _currentIndex = 0;
+  late final String? userId;
 
   @override
   void initState() {
     super.initState();
+    userId = FirebaseAuth.instance.currentUser?.uid;
     _cargarPartidos();
   }
 
@@ -146,7 +147,7 @@ class _PartidosViewState extends State<PartidosView> {
                   StreamBuilder<DocumentSnapshot>(
                     stream: FirebaseFirestore.instance
                         .collection('usuarios')
-                        .doc(widget.userId)
+                        .doc(userId)
                         .snapshots(),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
@@ -158,7 +159,8 @@ class _PartidosViewState extends State<PartidosView> {
                       }
                       String? imageUrl;
                       if (snapshot.hasData && snapshot.data!.data() != null) {
-                        final data = snapshot.data!.data() as Map<String, dynamic>;
+                        final data =
+                            snapshot.data!.data() as Map<String, dynamic>;
                         imageUrl = data['profileImageUrl'] as String?;
                       }
                       return GestureDetector(
@@ -168,9 +170,13 @@ class _PartidosViewState extends State<PartidosView> {
                         child: CircleAvatar(
                           radius: 20,
                           backgroundColor: Colors.grey[300],
-                          backgroundImage: (imageUrl != null && imageUrl.isNotEmpty)
-                              ? NetworkImage(imageUrl)
-                              : const AssetImage('assets/profile.jpg') as ImageProvider,
+                          backgroundImage:
+                              (imageUrl != null && imageUrl.isNotEmpty)
+                                  ? NetworkImage(imageUrl)
+                                  : null,
+                          child: (imageUrl == null || imageUrl.isEmpty)
+                              ? const Icon(Icons.person, color: Colors.white)
+                              : null,
                         ),
                       );
                     },
@@ -197,7 +203,8 @@ class _PartidosViewState extends State<PartidosView> {
                         decoration: InputDecoration(
                           hintText: 'Buscar',
                           hintStyle: const TextStyle(color: Colors.grey),
-                          prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                          prefixIcon:
+                              const Icon(Icons.search, color: Colors.grey),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(20),
                             borderSide: BorderSide.none,
@@ -213,9 +220,13 @@ class _PartidosViewState extends State<PartidosView> {
                   const SizedBox(width: 10),
                   ElevatedButton.icon(
                     onPressed: () async {
-                      final partidoCreado = await Navigator.of(context).push<bool>(
+                      final partidoCreado =
+                          await Navigator.of(context).push<bool>(
                         MaterialPageRoute(
-                          builder: (context) => CrearPartidoView(userId: widget.userId),
+                          builder: (context) =>
+                              CrearPartidoView(
+                                userId: userId!,
+                              ),
                         ),
                       );
 
@@ -262,7 +273,7 @@ class _PartidosViewState extends State<PartidosView> {
                               MaterialPageRoute(
                                 builder: (context) => DetallePartidoView(
                                   partidoId: partido.id,
-                                  userId: widget.userId,
+                                  userId: userId!,
                                 ),
                               ),
                             );

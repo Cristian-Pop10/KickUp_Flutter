@@ -3,7 +3,7 @@ import 'package:kickup/src/modelo/user_model.dart';
 import '../controlador/auth_controller.dart';
 import '../modelo/signup_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'perfil_view.dart';
+import 'partidos_view.dart';
 
 class RegistroView extends StatefulWidget {
   const RegistroView({Key? key}) : super(key: key);
@@ -24,6 +24,15 @@ class _RegistroViewState extends State<RegistroView> {
   final _posicionController = TextEditingController();
   final _telefonoController = TextEditingController();
   bool _isLoading = false;
+
+  final List<String> _posiciones = [
+    'portero',
+    'defensa',
+    'centrocampista',
+    'delantero',
+  ];
+
+  String? _posicionSeleccionada;
 
   @override
   void dispose() {
@@ -51,7 +60,7 @@ class _RegistroViewState extends State<RegistroView> {
 
       // Crea el UserModel con los nuevos campos
       final user = UserModel(
-        id: null, // Se puede asignar después del registro en Firebase Auth
+        id: null, 
         email: _emailController.text,
         password: _passwordController.text,
         edad: int.tryParse(_edadController.text),
@@ -60,7 +69,6 @@ class _RegistroViewState extends State<RegistroView> {
         telefono: _telefonoController.text,
         nombre: _nombreController.text,
         apellidos: _apellidosController.text,
-        // Puedes agregar nombre, apellidos, etc. si los pides en el formulario
       );
 
       final success = await _authController.registerWithUser(user);
@@ -79,7 +87,7 @@ class _RegistroViewState extends State<RegistroView> {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (context) => PerfilView(userId: currentUser.uid),
+              builder: (context) => PartidosView(),
             ),
           );
         }
@@ -245,7 +253,7 @@ class _RegistroViewState extends State<RegistroView> {
                               if (value == null || value.isEmpty)
                                 return 'Introduce tu edad';
                               final edad = int.tryParse(value);
-                              if (edad == null || edad < 0)
+                              if (edad == null || edad < 0 || edad > 80)
                                 return 'Edad no válida';
                               return null;
                             },
@@ -274,7 +282,7 @@ class _RegistroViewState extends State<RegistroView> {
                             controller: _nivelController,
                             validator: (value) {
                               if (value == null || value.isEmpty)
-                                return 'Introduce tu nivel';
+                                return 'Introduce tu nivel (1-5)';
                               final nivel = int.tryParse(value);
                               if (nivel == null || nivel < 1 || nivel > 5)
                                 return 'Nivel entre 1 y 5';
@@ -301,13 +309,9 @@ class _RegistroViewState extends State<RegistroView> {
                             ),
                           ),
                           const SizedBox(height: 8),
-                          TextFormField(
-                            controller: _posicionController,
-                            validator: (value) {
-                              if (value == null || value.isEmpty)
-                                return 'Introduce tu posición';
-                              return null;
-                            },
+                          DropdownButtonFormField<String>(
+                            value: _posicionSeleccionada,
+                            hint: const Text("Selecciona una posición"),
                             decoration: InputDecoration(
                               filled: true,
                               fillColor: Colors.grey[300],
@@ -318,6 +322,26 @@ class _RegistroViewState extends State<RegistroView> {
                               contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 20, vertical: 16),
                             ),
+                            items: _posiciones.map((String posicion) {
+                              return DropdownMenuItem<String>(
+                                value: posicion,
+                                child: Text(
+                                  posicion[0].toUpperCase() + posicion.substring(1),
+                                  style: const TextStyle(fontSize: 16),
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (String? newValue) {
+                              setState(() {
+                                _posicionSeleccionada = newValue;
+                                _posicionController.text = newValue ?? '';
+                              });
+                            },
+                            validator: (value) {
+                              if (value == null || value.isEmpty)
+                                return 'Selecciona tu posición';
+                              return null;
+                            },
                           ),
                           const SizedBox(height: 20),
                           const Text(
@@ -389,7 +413,13 @@ class _RegistroViewState extends State<RegistroView> {
                   const SizedBox(height: 16),
                   TextButton(
                     onPressed: () {
-                      Navigator.pop(context);
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => PartidosView(),
+                        ),
+                        (route) => false,
+                      );
                     },
                     child: const Text(
                       '¿Ya tienes cuenta? Inicia sesión',
