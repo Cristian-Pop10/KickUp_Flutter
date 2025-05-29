@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:kickup/src/componentes/app_styles.dart';
 import '../controlador/pista_controller.dart';
 import '../modelo/pista_model.dart';
 
@@ -106,16 +107,20 @@ class _DetallePistaViewState extends State<DetallePistaView> {
                         height: 200,
                         decoration: BoxDecoration(
                           color: Colors.grey[300],
-                          image: _pista!.imagenUrl != null && _pista!.imagenUrl!.isNotEmpty
+                          image: _pista!.imagenUrl != null &&
+                                  _pista!.imagenUrl!.isNotEmpty
                               ? DecorationImage(
-                                  image: _pista!.imagenUrl!.startsWith('assets/')
-                                      ? AssetImage(_pista!.imagenUrl!) as ImageProvider
-                                      : NetworkImage(_pista!.imagenUrl!),
+                                  image:
+                                      _pista!.imagenUrl!.startsWith('assets/')
+                                          ? AssetImage(_pista!.imagenUrl!)
+                                              as ImageProvider
+                                          : NetworkImage(_pista!.imagenUrl!),
                                   fit: BoxFit.cover,
                                 )
                               : null,
                         ),
-                        child: _pista!.imagenUrl == null || _pista!.imagenUrl!.isEmpty
+                        child: _pista!.imagenUrl == null ||
+                                _pista!.imagenUrl!.isEmpty
                             ? const Center(
                                 child: Icon(
                                   Icons.sports_soccer,
@@ -175,9 +180,9 @@ class _DetallePistaViewState extends State<DetallePistaView> {
                                   const SizedBox(width: 8),
                                   Text(
                                     _pista!.tipo!,
-                                    style: const TextStyle(
+                                    style:  TextStyle(
                                       fontSize: 16,
-                                      color: Colors.grey,
+                                      color:Theme.of(context).textTheme.bodyMedium?.color,
                                     ),
                                   ),
                                 ],
@@ -288,9 +293,17 @@ class _DetallePistaViewState extends State<DetallePistaView> {
                               width: double.infinity,
                               height: 50,
                               child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary(
+                                      context), // color adaptado
+                                  foregroundColor:
+                                      Colors.white, // color del texto
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
                                 onPressed: _pista!.disponible
                                     ? () {
-                                        // Aquí iría la lógica para reservar la pista
                                         ScaffoldMessenger.of(context)
                                             .showSnackBar(
                                           const SnackBar(

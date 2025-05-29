@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:kickup/src/componentes/app_styles.dart';
 import 'package:kickup/src/vista/crear_equipo_view.dart';
 import '../controlador/equipo_controller.dart';
 import '../modelo/equipo_model.dart';
@@ -9,7 +10,6 @@ import '../controlador/auth_controller.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class EquiposView extends StatefulWidget {
-
   const EquiposView({
     Key? key,
   }) : super(key: key);
@@ -90,11 +90,11 @@ class _EquiposViewState extends State<EquiposView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFD7EAD9),
+      backgroundColor: AppColors.background(context),
       body: Container(
         margin: const EdgeInsets.fromLTRB(16, 60, 16, 16),
         decoration: BoxDecoration(
-          color: const Color(0xFFE5EFE6),
+          color: AppColors.fieldBackground(context),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Column(
@@ -154,20 +154,31 @@ class _EquiposViewState extends State<EquiposView> {
               child: Container(
                 height: 50,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFD7D7D7),
+                  color: Colors.white, // Fondo blanco del contenedor
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color.fromARGB(255, 208, 208, 208)
+                          .withOpacity(0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                   borderRadius: BorderRadius.circular(25),
                 ),
                 child: TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
                     hintText: 'Buscar',
-                    hintStyle: const TextStyle(color: Colors.grey),
-                    prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                    hintStyle: TextStyle(color: Theme.of(context).hintColor),
+                    prefixIcon: Icon(Icons.search,
+                        color: Theme.of(context).iconTheme.color),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(20),
                       borderSide: BorderSide.none,
                     ),
                     contentPadding: const EdgeInsets.symmetric(vertical: 15),
+                    filled: true, 
+                    fillColor:Theme.of(context).scaffoldBackgroundColor, 
                   ),
                 ),
               ),
@@ -181,21 +192,25 @@ class _EquiposViewState extends State<EquiposView> {
                 child: ElevatedButton(
                   onPressed: _navegarACrearEquipo,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF5A9A7A),
-                    foregroundColor: Colors.white,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(25),
                     ),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.add),
+                      Icon(
+                        Icons.add,
+                        color: Colors.white,
+                      ),
                       SizedBox(width: 8),
                       Text(
                         'AÑADIR',
                         style: TextStyle(
-                          fontSize: 16,
+                          color: Colors.white,
+                          fontSize: 14,
                           fontWeight: FontWeight.bold,
                         ),
                       ),

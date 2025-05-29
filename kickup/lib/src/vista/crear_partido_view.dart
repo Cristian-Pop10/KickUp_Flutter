@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:kickup/src/componentes/app_styles.dart';
 import '../controlador/partido_controller.dart';
 import '../modelo/partido_model.dart';
 import '../modelo/user_model.dart';
@@ -26,7 +27,8 @@ class _CrearPartidoViewState extends State<CrearPartidoView> {
   final TextEditingController _fechaController = TextEditingController();
   final TextEditingController _horaController = TextEditingController();
   final TextEditingController _ubicacionController = TextEditingController();
-  final TextEditingController _precioController = TextEditingController(text: '1.0'); 
+  final TextEditingController _precioController =
+      TextEditingController();
   // Variables para almacenar los valores seleccionados
   DateTime? _fechaSeleccionada;
   TimeOfDay? _horaSeleccionada;
@@ -134,11 +136,11 @@ class _CrearPartidoViewState extends State<CrearPartidoView> {
         final nuevoPartido = PartidoModel(
           id: 'partido_${DateTime.now().millisecondsSinceEpoch}',
           fecha: fechaHora,
-          tipo: _tipoSeleccionado, 
+          tipo: _tipoSeleccionado,
           lugar: _ubicacionController.text,
           completo: false,
           jugadoresFaltantes: integrantes - 1,
-          precio: precio, 
+          precio: precio,
           duracion: 90,
           jugadores: [
             UserModel(
@@ -180,18 +182,19 @@ class _CrearPartidoViewState extends State<CrearPartidoView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFE5EFE6),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon:
+              Icon(Icons.arrow_back, color: Theme.of(context).iconTheme.color),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text(
-          'Crear Partido',
+        title: Text(
+          'Nuevo Partido',
           style: TextStyle(
-            color: Colors.black,
+            color: Theme.of(context).textTheme.headlineMedium?.color,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -207,25 +210,16 @@ class _CrearPartidoViewState extends State<CrearPartidoView> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Center(
-                        child: Text(
-                          'Nuevo partido',
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      ),
+                      
                       const SizedBox(height: 30),
 
                       // Campo Tipo de Partido
-                      const Text(
+                      Text(
                         'Tipo de Partido',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -234,7 +228,11 @@ class _CrearPartidoViewState extends State<CrearPartidoView> {
                         items: _tiposPartido
                             .map((tipo) => DropdownMenuItem(
                                   value: tipo,
-                                  child: Text(tipo),
+                                  child: Text(tipo,
+                                      style: TextStyle(
+                                        color: AppColors.textSecondary(context),
+                                        fontSize: 16,
+                                      )),
                                 ))
                             .toList(),
                         onChanged: (value) {
@@ -243,31 +241,37 @@ class _CrearPartidoViewState extends State<CrearPartidoView> {
                           });
                         },
                         decoration: InputDecoration(
+                          hintStyle:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: AppColors.textSecondary(context),
+                                  ),
                           filled: true,
-                          fillColor: const Color(0xFFE8DDBD),
+                          fillColor: AppColors.fieldBackground(context),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(15),
                             borderSide: BorderSide.none,
                           ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 15),
                         ),
                       ),
                       const SizedBox(height: 20),
 
                       // Campo Precio
-                      const Text(
+                      Text(
                         'Precio (€)',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
                         ),
                       ),
                       const SizedBox(height: 8),
                       _buildTextField(
                         controller: _precioController,
                         hintText: 'Precio por persona',
-                        keyboardType: TextInputType.numberWithOptions(decimal: true),
+                        keyboardType:
+                            TextInputType.numberWithOptions(decimal: true),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return 'Por favor ingresa el precio';
@@ -282,12 +286,12 @@ class _CrearPartidoViewState extends State<CrearPartidoView> {
                       const SizedBox(height: 20),
 
                       // Campo Nombre
-                      const Text(
+                      Text(
                         'Nombre',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -304,12 +308,12 @@ class _CrearPartidoViewState extends State<CrearPartidoView> {
                       const SizedBox(height: 20),
 
                       // Campo Integrantes
-                      const Text(
+                      Text(
                         'Integrantes',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -322,7 +326,8 @@ class _CrearPartidoViewState extends State<CrearPartidoView> {
                             return 'Por favor ingresa el número de integrantes';
                           }
                           final integrantes = int.tryParse(value);
-                          final maxIntegrantes = maxIntegrantesPorTipo[_tipoSeleccionado] ?? 22;
+                          final maxIntegrantes =
+                              maxIntegrantesPorTipo[_tipoSeleccionado] ?? 22;
                           if (integrantes == null || integrantes < 2) {
                             return 'Debe haber al menos 2 integrantes';
                           }
@@ -335,12 +340,12 @@ class _CrearPartidoViewState extends State<CrearPartidoView> {
                       const SizedBox(height: 20),
 
                       // Campo Fecha
-                      const Text(
+                      Text(
                         'Fecha',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -360,12 +365,12 @@ class _CrearPartidoViewState extends State<CrearPartidoView> {
                       const SizedBox(height: 20),
 
                       // Campo Hora
-                      const Text(
+                      Text(
                         'Hora',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -385,12 +390,12 @@ class _CrearPartidoViewState extends State<CrearPartidoView> {
                       const SizedBox(height: 20),
 
                       // Campo Ubicación
-                      const Text(
+                      Text(
                         'Ubicación',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -413,8 +418,10 @@ class _CrearPartidoViewState extends State<CrearPartidoView> {
                         child: ElevatedButton(
                           onPressed: _guardarPartido,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF5A9A7A),
-                            foregroundColor: Colors.white,
+                            backgroundColor:
+                                Theme.of(context).colorScheme.primary,
+                            foregroundColor:
+                                Theme.of(context).colorScheme.onPrimary,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(25),
                             ),
@@ -445,33 +452,34 @@ class _CrearPartidoViewState extends State<CrearPartidoView> {
     Widget? suffixIcon,
     String? Function(String?)? validator,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFE8DDBD), // Color beige claro para los campos
-        borderRadius: BorderRadius.circular(15),
-      ),
-      child: TextFormField(
-        controller: controller,
-        keyboardType: keyboardType,
-        readOnly: readOnly,
-        onTap: onTap,
-        decoration: InputDecoration(
-          hintText: hintText,
-          hintStyle: const TextStyle(color: Colors.black54),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(15 ),
-            borderSide: BorderSide.none,
-          ),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-          suffixIcon: suffixIcon,
+    final theme = Theme.of(context);
+
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      readOnly: readOnly,
+      onTap: onTap,
+      decoration: InputDecoration(
+        hintText: hintText,
+        hintStyle: theme.textTheme.bodyMedium?.copyWith(
+          color: AppColors.textSecondary(context),
         ),
-        style: const TextStyle(
-          fontSize: 16,
-          color: Colors.black87,
+        filled: true,
+        fillColor:
+            AppColors.fieldBackground(context), // Color de fondo adaptativo
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(15),
+          borderSide: BorderSide.none,
         ),
-        validator: validator,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+        suffixIcon: suffixIcon,
       ),
+      style: theme.textTheme.bodyLarge?.copyWith(
+        color: AppColors.textPrimary(context),
+        fontSize: 16,
+      ),
+      validator: validator,
     );
   }
 }

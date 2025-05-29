@@ -1,14 +1,17 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:kickup/src/componentes/app_styles.dart';
 import 'package:kickup/src/controlador/auth_controller.dart';
 import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:kickup/src/controlador/perfil_controller.dart';
 import 'package:kickup/src/modelo/user_model.dart';
+import 'package:kickup/src/vista/configuracion_view.dart';
 
 class PerfilView extends StatefulWidget {
-
-  const PerfilView({Key? key, }) : super(key: key);
+  const PerfilView({
+    Key? key,
+  }) : super(key: key);
 
   @override
   State<PerfilView> createState() => _PerfilViewState();
@@ -41,10 +44,7 @@ class _PerfilViewState extends State<PerfilView> {
   // Variable para almacenar la posición seleccionada
   String? _posicionSeleccionada;
 
-  // Color para los campos de formulario en modo edición
-  final Color _formFieldColor = Colors.white;
-
-  late final String? userId; 
+  late final String? userId;
 
   @override
   void initState() {
@@ -153,9 +153,9 @@ class _PerfilViewState extends State<PerfilView> {
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text('Perfil actualizado correctamente'),
-            backgroundColor: Colors.green,
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           ),
         );
       } else {
@@ -205,7 +205,7 @@ class _PerfilViewState extends State<PerfilView> {
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFFE5EFE6),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -386,24 +386,25 @@ class _PerfilViewState extends State<PerfilView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFE5EFE6),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon:
+              Icon(Icons.arrow_back, color: Theme.of(context).iconTheme.color),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text(
+        title: Text(
           'Perfil',
           style: TextStyle(
-            color: Colors.black,
+            color: Theme.of(context).textTheme.bodyLarge?.color,
             fontWeight: FontWeight.bold,
           ),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout, color: Colors.black),
+            icon: Icon(Icons.logout, color: Theme.of(context).iconTheme.color),
             onPressed: _cerrarSesion,
           ),
         ],
@@ -416,7 +417,7 @@ class _PerfilViewState extends State<PerfilView> {
                   child: Container(
                     margin: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE5EFE6),
+                      color: AppColors.background(context),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Column(
@@ -495,7 +496,9 @@ class _PerfilViewState extends State<PerfilView> {
                                             labelText: 'Nombre *',
                                             border: const OutlineInputBorder(),
                                             filled: true,
-                                            fillColor: _formFieldColor,
+                                            fillColor:
+                                                AppColors.fieldBackground(
+                                                    context),
                                             errorText: _nombreController.text
                                                     .trim()
                                                     .isEmpty
@@ -510,7 +513,9 @@ class _PerfilViewState extends State<PerfilView> {
                                             labelText: 'Apellidos',
                                             border: const OutlineInputBorder(),
                                             filled: true,
-                                            fillColor: _formFieldColor,
+                                            fillColor:
+                                                AppColors.fieldBackground(
+                                                    context),
                                           ),
                                         ),
                                       ],
@@ -534,43 +539,63 @@ class _PerfilViewState extends State<PerfilView> {
                                     ),
                               const SizedBox(height: 16),
                               // Botón Editar Perfil
-                              TextButton(
-                                onPressed: () {
-                                  setState(() {
-                                    _isEditing = !_isEditing;
-                                    if (!_isEditing) {
-                                      // Si estábamos editando y cancelamos, restauramos los valores originales
-                                      _nombreController.text =
-                                          _usuario!.nombre ?? '';
-                                      _apellidosController.text =
-                                          _usuario!.apellidos ?? '';
-                                      _edadController.text =
-                                          _usuario!.edad?.toString() ?? '';
-                                      _nivelController.text =
-                                          _usuario!.nivel?.toString() ?? '';
-                                      _posicionSeleccionada =
-                                          _usuario!.posicion?.toLowerCase();
-                                      _telefonoController.text =
-                                          _usuario!.telefono ?? '';
-                                      _emailController.text =
-                                          _usuario!.email;
-                                    }
-                                  });
-                                },
-                                style: TextButton.styleFrom(
-                                  foregroundColor: const Color(0xFF5A9A7A),
-                                ),
-                                child: Text(
-                                  _isEditing ? 'Cancelar' : 'Editar Perfil',
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.center,
+                                children: [
+                                  TextButton(
+                                    onPressed: () {
+                                      setState(() {
+                                        _isEditing = !_isEditing;
+                                        if (!_isEditing) {
+                                          // Si estábamos editando y cancelamos, restauramos los valores originales
+                                          _nombreController.text =
+                                              _usuario!.nombre ?? '';
+                                          _apellidosController.text =
+                                              _usuario!.apellidos ?? '';
+                                          _edadController.text =
+                                              _usuario!.edad?.toString() ?? '';
+                                          _nivelController.text =
+                                              _usuario!.nivel?.toString() ?? '';
+                                          _posicionSeleccionada =
+                                              _usuario!.posicion?.toLowerCase();
+                                          _telefonoController.text =
+                                              _usuario!.telefono ?? '';
+                                          _emailController.text =
+                                              _usuario!.email;
+                                        }
+                                      });
+                                    },
+                                    style: TextButton.styleFrom(
+                                      foregroundColor:
+                                          Theme.of(context).colorScheme.primary,
+                                    ),
+                                    child: Text(
+                                      _isEditing ? 'Cancelar' : 'Editar Perfil',
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
                                   ),
-                                ),
+                                  IconButton(
+                                    icon: Icon(Icons.settings,
+                                        color:
+                                            Theme.of(context).iconTheme.color),
+                                    onPressed: () {
+                                      Navigator.of(context)
+                                          .push(MaterialPageRoute(
+                                        builder: (_) =>
+                                            const ConfiguracionView(),
+                                      ));
+                                    },
+                                  ),
+                                ],
                               ),
                             ],
                           ),
                         ),
+
                         const SizedBox(height: 24),
                         // Campos de información personal
                         Padding(
@@ -616,8 +641,11 @@ class _PerfilViewState extends State<PerfilView> {
                                   child: ElevatedButton(
                                     onPressed: _guardarCambios,
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF5A9A7A),
-                                      foregroundColor: Colors.white,
+                                      backgroundColor:
+                                          Theme.of(context).colorScheme.primary,
+                                      foregroundColor: Theme.of(context)
+                                          .colorScheme
+                                          .onPrimary,
                                       padding: const EdgeInsets.symmetric(
                                           vertical: 16),
                                       shape: RoundedRectangleBorder(
@@ -668,7 +696,7 @@ class _PerfilViewState extends State<PerfilView> {
                 keyboardType: keyboardType,
                 decoration: InputDecoration(
                   filled: true,
-                  fillColor: _formFieldColor,
+                  fillColor: AppColors.fieldBackground(context),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -685,7 +713,8 @@ class _PerfilViewState extends State<PerfilView> {
                   vertical: 12,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE8DFC9),
+                  color: AppColors.fieldBackground(context),
+                  border: Border.all(color: Colors.grey.shade400),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
@@ -714,7 +743,7 @@ class _PerfilViewState extends State<PerfilView> {
         _isEditing
             ? Container(
                 decoration: BoxDecoration(
-                  color: _formFieldColor,
+                  color: AppColors.fieldBackground(context),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: Colors.grey.shade400),
                 ),
@@ -731,7 +760,7 @@ class _PerfilViewState extends State<PerfilView> {
                       vertical: 12,
                     ),
                     filled: true,
-                    fillColor: _formFieldColor,
+                    fillColor: AppColors.fieldBackground(context),
                   ),
                   items: _posiciones.map((String posicion) {
                     return DropdownMenuItem<String>(
@@ -747,7 +776,8 @@ class _PerfilViewState extends State<PerfilView> {
                       _posicionSeleccionada = newValue;
                     });
                   },
-                  dropdownColor: _formFieldColor,
+                  dropdownColor:
+                      Theme.of(context).inputDecorationTheme.fillColor,
                 ),
               )
             : Container(
@@ -757,7 +787,8 @@ class _PerfilViewState extends State<PerfilView> {
                   vertical: 12,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE8DFC9),
+                  color: AppColors.fieldBackground(context),
+                  border: Border.all(color: Colors.grey.shade400),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
@@ -765,7 +796,8 @@ class _PerfilViewState extends State<PerfilView> {
                       ? _usuario!.posicion![0].toUpperCase() +
                           _usuario!.posicion!.substring(1)
                       : '',
-                  style: const TextStyle(
+                  style: TextStyle(
+                    color: Theme.of(context).textTheme.bodyLarge?.color,
                     fontSize: 16,
                   ),
                 ),

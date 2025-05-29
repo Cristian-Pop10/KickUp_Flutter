@@ -167,18 +167,20 @@ class _CrearEquipoViewState extends State<CrearEquipoView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFE5EFE6), // Fondo verde claro
+      backgroundColor:
+          Theme.of(context).scaffoldBackgroundColor, // Fondo verde claro
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon:
+              Icon(Icons.arrow_back, color: Theme.of(context).iconTheme.color),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text(
-          'Crear Equipo',
+        title: Text(
+          'Nuevo Equipo',
           style: TextStyle(
-            color: Colors.black,
+            color: Theme.of(context).textTheme.headlineMedium?.color,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -194,16 +196,6 @@ class _CrearEquipoViewState extends State<CrearEquipoView> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Center(
-                        child: Text(
-                          'Nuevo equipo',
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      ),
                       const SizedBox(height: 30),
 
                       // Logo del equipo
@@ -214,9 +206,13 @@ class _CrearEquipoViewState extends State<CrearEquipoView> {
                             width: 120,
                             height: 120,
                             decoration: BoxDecoration(
-                              color: const Color(0xFFE8DDBD),
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .primary, // Fondo claro
                               borderRadius: BorderRadius.circular(60),
-                              border: Border.all(color: Colors.grey[300]!),
+                              border: Border.all(
+                                  color: Theme.of(context).primaryColor,
+                                  width: 2),
                             ),
                             child: _logoImage != null
                                 ? ClipRRect(
@@ -226,33 +222,34 @@ class _CrearEquipoViewState extends State<CrearEquipoView> {
                                       fit: BoxFit.cover,
                                     ),
                                   )
-                                : const Icon(
+                                : Icon(
                                     Icons.add_photo_alternate,
                                     size: 50,
-                                    color: Colors.grey,
+                                    color: Theme.of(context)
+                                        .primaryColor, // Icono de añadir foto
                                   ),
                           ),
                         ),
                       ),
                       const SizedBox(height: 5),
-                      const Center(
+                      Center(
                         child: Text(
                           'Añadir logo',
                           style: TextStyle(
                             fontSize: 14,
-                            color: Colors.grey,
+                            color: Theme.of(context).textTheme.bodyLarge?.color,
                           ),
                         ),
                       ),
                       const SizedBox(height: 30),
 
                       // Campo Nombre
-                      const Text(
+                      Text(
                         'Nombre del equipo',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -269,12 +266,12 @@ class _CrearEquipoViewState extends State<CrearEquipoView> {
                       const SizedBox(height: 20),
 
                       // Campo Tipo
-                      const Text(
+                      Text(
                         'Tipo',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -294,12 +291,12 @@ class _CrearEquipoViewState extends State<CrearEquipoView> {
                       const SizedBox(height: 20),
 
                       // Campo Nivel
-                      const Text(
+                      Text(
                         'Nivel',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -319,39 +316,28 @@ class _CrearEquipoViewState extends State<CrearEquipoView> {
                         },
                       ),
                       const SizedBox(height: 20),
-
                       // Campo Descripción
-                      const Text(
+                      Text(
                         'Descripción',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: const Color(
-                              0xFFE8DDBD), // Color beige claro para los campos
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: TextFormField(
-                          controller: _descripcionController,
-                          maxLines: 4,
-                          decoration: const InputDecoration(
-                            hintText: 'Describe tu equipo',
-                            hintStyle: TextStyle(color: Colors.black54),
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(
-                                horizontal: 20, vertical: 15),
-                          ),
-                          style: const TextStyle(
-                            fontSize: 16,
-                            color: Colors.black87,
-                          ),
-                        ),
+                      _buildTextField(
+                        controller: _descripcionController,
+                        hintText: 'Describe tu equipo',
+                        keyboardType: TextInputType.multiline,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Por favor escribe una descripción';
+                          }
+                          return null;
+                        },
                       ),
+
                       const SizedBox(height: 40),
 
                       // Botón Guardar
@@ -361,8 +347,10 @@ class _CrearEquipoViewState extends State<CrearEquipoView> {
                         child: ElevatedButton(
                           onPressed: _guardarEquipo,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF5A9A7A),
-                            foregroundColor: Colors.white,
+                            backgroundColor:
+                                Theme.of(context).colorScheme.primary,
+                            foregroundColor:
+                                Theme.of(context).colorScheme.onPrimary,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(25),
                             ),
@@ -393,30 +381,33 @@ class _CrearEquipoViewState extends State<CrearEquipoView> {
     Widget? suffixIcon,
     String? Function(String?)? validator,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFE8DDBD), // Color beige claro para los campos
-        borderRadius: BorderRadius.circular(15),
-      ),
-      child: TextFormField(
-        controller: controller,
-        keyboardType: keyboardType,
-        readOnly: readOnly,
-        onTap: onTap,
-        decoration: InputDecoration(
-          hintText: hintText,
-          hintStyle: const TextStyle(color: Colors.black54),
-          border: InputBorder.none,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-          suffixIcon: suffixIcon,
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      readOnly: readOnly,
+      onTap: onTap,
+      decoration: InputDecoration(
+        hintText: hintText,
+        hintStyle: TextStyle(
+          color: Theme.of(context).inputDecorationTheme.hintStyle?.color ??
+              Colors.grey, // Color del hint
         ),
-        style: const TextStyle(
-          fontSize: 16,
-          color: Colors.black87,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(15),
+          borderSide: BorderSide.none,
         ),
-        validator: validator,
+        filled: true,
+        fillColor: Theme.of(context).inputDecorationTheme.fillColor,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+        suffixIcon: suffixIcon,
       ),
+      style: TextStyle(
+        fontSize: 16,
+        color: Theme.of(context).textTheme.bodyLarge?.color,
+      ),
+      validator: validator,
     );
   }
+// This method builds a text field with the provided parameters.
 }

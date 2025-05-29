@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:kickup/src/componentes/app_styles.dart';
 import '../controlador/equipo_controller.dart';
 import '../modelo/equipo_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -200,18 +201,19 @@ class _DetalleEquipoViewState extends State<DetalleEquipoView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFE5EFE6), // Fondo verde claro
+      backgroundColor: AppColors.background(context),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon:
+              Icon(Icons.arrow_back, color: Theme.of(context).iconTheme.color),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text(
+        title: Text(
           'Equipos',
           style: TextStyle(
-            color: Colors.black,
+            color: Theme.of(context).textTheme.headlineMedium?.color,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -343,13 +345,12 @@ class _DetalleEquipoViewState extends State<DetalleEquipoView> {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Jugadores',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      fontStyle: FontStyle.italic,
-                    ),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontStyle: FontStyle.italic,
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                   const SizedBox(height: 10),
                   ListView.builder(
@@ -373,10 +374,12 @@ class _DetalleEquipoViewState extends State<DetalleEquipoView> {
                                 as Map<String, dynamic>;
                             imageUrl = userData['profileImageUrl'] as String?;
                           }
+
                           return ListTile(
                             leading: CircleAvatar(
                               radius: 20,
-                              backgroundColor: Colors.grey[300],
+                              backgroundColor:
+                                  Theme.of(context).colorScheme.primary,
                               backgroundImage:
                                   (imageUrl != null && imageUrl.isNotEmpty)
                                       ? NetworkImage(imageUrl)
@@ -388,11 +391,17 @@ class _DetalleEquipoViewState extends State<DetalleEquipoView> {
                             ),
                             title: Text(
                               '${jugador['nombre'] ?? ''} ${jugador['apellidos'] ?? ''}',
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.bold),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyLarge
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
                             ),
-                            subtitle:
-                                Text(jugador['posicion'] ?? 'Sin posición'),
+                            subtitle: Text(
+                              jugador['posicion'] ?? 'Sin posición',
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
                           );
                         },
                       );
@@ -429,8 +438,8 @@ class _DetalleEquipoViewState extends State<DetalleEquipoView> {
                   ? null
                   : (_esMiembro ? _abandonarEquipo : _unirseAlEquipo),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF5A9A7A),
-                foregroundColor: Colors.white,
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(25),
                 ),

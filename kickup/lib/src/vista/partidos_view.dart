@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:kickup/src/componentes/app_styles.dart';
 import 'package:kickup/src/controlador/auth_controller.dart';
 import 'package:kickup/src/controlador/partido_controller.dart';
 import 'package:kickup/src/modelo/partido_model.dart';
@@ -9,7 +10,6 @@ import '../componentes/bottom_nav_bar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class PartidosView extends StatefulWidget {
-
   const PartidosView({
     Key? key,
   }) : super(key: key);
@@ -119,11 +119,12 @@ class _PartidosViewState extends State<PartidosView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFD7EAD9), // Fondo verde claro
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Container(
         margin: const EdgeInsets.fromLTRB(16, 60, 16, 16),
         decoration: BoxDecoration(
-          color: const Color(0xFFE5EFE6), // Fondo más claro para el contenido
+          color: AppColors.fieldBackground(
+              context), // Fondo más claro para el contenido
           borderRadius: BorderRadius.circular(30),
         ),
         child: Column(
@@ -194,25 +195,37 @@ class _PartidosViewState extends State<PartidosView> {
                     child: Container(
                       height: 50,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFD7D7D7),
+                        color: Colors.white, // <- AQUÍ CAMBIADO
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color.fromARGB(255, 208, 208, 208)
+                                .withOpacity(0.1),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                         borderRadius: BorderRadius.circular(25),
                       ),
                       child: TextField(
                         controller: _searchController,
-                        onChanged: _buscarPartidos,
                         decoration: InputDecoration(
                           hintText: 'Buscar',
-                          hintStyle: const TextStyle(color: Colors.grey),
-                          prefixIcon:
-                              const Icon(Icons.search, color: Colors.grey),
+                          hintStyle: TextStyle(
+                            color: Theme.of(context)
+                                .inputDecorationTheme
+                                .hintStyle
+                                ?.color,
+                          ),
+                          prefixIcon: Icon(Icons.search,
+                              color: Theme.of(context).iconTheme.color),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(20),
                             borderSide: BorderSide.none,
                           ),
-                          filled: true,
-                          fillColor: Colors.white,
-                          contentPadding: const EdgeInsets.symmetric(
-                              vertical: 15, horizontal: 20),
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 15),
+                          filled: true, 
+                          fillColor: AppColors.background(context), 
                         ),
                       ),
                     ),
@@ -223,10 +236,9 @@ class _PartidosViewState extends State<PartidosView> {
                       final partidoCreado =
                           await Navigator.of(context).push<bool>(
                         MaterialPageRoute(
-                          builder: (context) =>
-                              CrearPartidoView(
-                                userId: userId!,
-                              ),
+                          builder: (context) => CrearPartidoView(
+                            userId: userId!,
+                          ),
                         ),
                       );
 
@@ -241,7 +253,8 @@ class _PartidosViewState extends State<PartidosView> {
                       style: TextStyle(color: Colors.white),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF5A9A7A),
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(20),
                       ),
@@ -320,7 +333,8 @@ class _PartidoCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFFD2C9A0), // Color beige para las tarjetas
+          color:
+              AppColors.adaptiveBeige(context), // Color beige para las tarjetas
           borderRadius: BorderRadius.circular(15),
         ),
         child: Column(

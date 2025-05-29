@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:kickup/src/componentes/app_styles.dart';
 import '../componentes/bottom_nav_bar.dart';
 import '../controlador/pista_controller.dart';
 import '../modelo/pista_model.dart';
@@ -144,13 +145,13 @@ class _PistasViewState extends State<PistasView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFE5EFE6), // Fondo verde claro
+      backgroundColor:  Theme.of(context).scaffoldBackgroundColor, // Fondo verde claro
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(60), // Altura fija para el AppBar
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: const BoxDecoration(
-            color: Color(0xFFE5EFE6), // Mismo color que el fondo
+          decoration: BoxDecoration(
+            color:Theme.of(context).scaffoldBackgroundColor, // Mismo color que el fondo
           ),
           child: SafeArea(
             child: Row(
@@ -158,10 +159,10 @@ class _PistasViewState extends State<PistasView> {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 // Título "Pistas"
-                const Text(
+                 Text(
                   'Pistas',
                   style: TextStyle(
-                    color: Colors.black,
+                    color: AppColors.textPrimary(context), // Color del texto del tema
                     fontWeight: FontWeight.bold,
                     fontSize: 22,
                   ),
@@ -173,13 +174,13 @@ class _PistasViewState extends State<PistasView> {
                     // Botón para alternar entre lista y mapa
                     Container(
                       decoration: BoxDecoration(
-                        color: const Color(0xFF5A9A7A).withOpacity(0.1),
+                        color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: IconButton(
                         icon: Icon(
                           _mostrarMapa ? Icons.list : Icons.map,
-                          color: const Color(0xFF5A9A7A),
+                          color: Theme.of(context).iconTheme.color, // Color del icono del tema
                           size: 24,
                         ),
                         onPressed: () {
@@ -200,9 +201,9 @@ class _PistasViewState extends State<PistasView> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: IconButton(
-                        icon: const Icon(
+                        icon:  Icon(
                           Icons.refresh,
-                          color: Color(0xFF5A9A7A),
+                          color: Theme.of(context).iconTheme.color, // Color del icono del tema
                           size: 24,
                         ),
                         onPressed: _cargarPistas,
@@ -221,7 +222,7 @@ class _PistasViewState extends State<PistasView> {
       body: Container(
         margin: const EdgeInsets.fromLTRB(16, 8, 16, 16), // Reducir el margen superior
         decoration: BoxDecoration(
-          color: const Color(0xFFE5EFE6), // Mismo color que el fondo
+          color:AppColors.background(context), // Mismo color que el fondo
           borderRadius: BorderRadius.circular(20),
         ),
         child: _isLoading
@@ -239,8 +240,8 @@ class _PistasViewState extends State<PistasView> {
                         ElevatedButton(
                           onPressed: _cargarPistas,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF5A9A7A),
-                            foregroundColor: Colors.white,
+                            backgroundColor: Theme.of(context).colorScheme.primary,
+                            foregroundColor: Theme.of(context).colorScheme.onPrimary,
                           ),
                           child: const Text('Reintentar'),
                         ),
@@ -330,6 +331,7 @@ class _PistasViewState extends State<PistasView> {
 
   Widget _buildPistaCard(PistaModel pista) {
     return Card(
+      color: AppColors.fieldBackground(context), // Mismo color que el fondo
       margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(15),
@@ -348,7 +350,7 @@ class _PistasViewState extends State<PistasView> {
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: Colors.grey[300],
+                  color: AppColors.cardBackground(context), // Color de fondo del contenedor
                   borderRadius: BorderRadius.circular(8),
                   image: pista.imagenUrl != null && pista.imagenUrl!.isNotEmpty
                       ? DecorationImage(
@@ -413,7 +415,7 @@ class _PistasViewState extends State<PistasView> {
                         pista.tipo!,
                         style: TextStyle(
                           fontSize: 14,
-                          color: Colors.grey[600],
+                          color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.8) ?? Colors.grey,
                         ),
                       ),
                     const SizedBox(height: 4),

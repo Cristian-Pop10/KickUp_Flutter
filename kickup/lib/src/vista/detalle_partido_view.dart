@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:kickup/src/componentes/app_styles.dart';
 import 'package:kickup/src/controlador/auth_controller.dart';
 import 'package:kickup/src/controlador/partido_controller.dart';
 import 'package:kickup/src/modelo/partido_model.dart';
@@ -220,18 +221,23 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFD7EAD9), // Fondo verde claro
+      backgroundColor:
+          Theme.of(context).scaffoldBackgroundColor, // Fondo verde claro
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+        titleTextStyle: Theme.of(context).appBarTheme.titleTextStyle,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: Icon(Icons.arrow_back,
+              color: Theme.of(context).iconTheme.color), // Color del icono
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text(
+        title: Text(
           'Detalle del partido',
           style: TextStyle(
-            color: Colors.black,
+            color: Theme.of(context)
+                .inputDecorationTheme
+                .hoverColor, // Color del texto
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -244,8 +250,7 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
                   child: Container(
                     margin: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: const Color(
-                          0xFFE5EFE6), // Fondo más claro para el contenido
+                      color:AppColors.fieldBackground(context), // Fondo más claro para el contenido
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Column(
@@ -254,9 +259,8 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
                         // Encabezado con fecha y tipo de partido
                         Container(
                           padding: const EdgeInsets.all(16),
-                          decoration: const BoxDecoration(
-                            color: Color(
-                                0xFFD2C9A0), // Color beige para el encabezado
+                          decoration:  BoxDecoration(
+                            color: AppColors.adaptiveBeige(context), // Color beige para el encabezado
                             borderRadius: BorderRadius.only(
                               topLeft: Radius.circular(20),
                               topRight: Radius.circular(20),
@@ -384,8 +388,12 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
                                           data['jugadores'] ?? []);
 
                                   if (jugadores.isEmpty) {
-                                    return const Text(
-                                        'No hay jugadores inscritos.');
+                                    return Text(
+                                      'No hay jugadores inscritos.',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium,
+                                    );
                                   }
 
                                   return ListView.builder(
@@ -399,8 +407,13 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
                                           jugador['id'] as String?;
 
                                       if (jugadorId == null) {
-                                        return const ListTile(
-                                          title: Text('Jugador no válido'),
+                                        return ListTile(
+                                          title: Text(
+                                            'Jugador no válido',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodyMedium,
+                                          ),
                                         );
                                       }
 
@@ -412,23 +425,38 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
                                         builder: (context, userSnapshot) {
                                           if (userSnapshot.connectionState ==
                                               ConnectionState.waiting) {
-                                            return const ListTile(
-                                                title: Text(
-                                                    'Cargando jugador...'));
+                                            return ListTile(
+                                              title: Text(
+                                                'Cargando jugador...',
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .bodyMedium,
+                                              ),
+                                            );
                                           }
 
                                           if (userSnapshot.hasError) {
-                                            return const ListTile(
-                                                title: Text(
-                                                    'Error al cargar jugador'));
+                                            return ListTile(
+                                              title: Text(
+                                                'Error al cargar jugador',
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .bodyMedium,
+                                              ),
+                                            );
                                           }
 
                                           if (!userSnapshot.hasData ||
                                               userSnapshot.data!.data() ==
                                                   null) {
-                                            return const ListTile(
-                                                title: Text(
-                                                    'Jugador no encontrado'));
+                                            return ListTile(
+                                              title: Text(
+                                                'Jugador no encontrado',
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .bodyMedium,
+                                              ),
+                                            );
                                           }
 
                                           final userData = userSnapshot.data!
@@ -447,6 +475,9 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
                                           return ListTile(
                                             leading: CircleAvatar(
                                               radius: 20,
+                                              backgroundColor: Theme.of(context)
+                                                  .colorScheme
+                                                  .primary,
                                               backgroundImage:
                                                   (imageUrl != null &&
                                                           imageUrl.isNotEmpty)
@@ -460,10 +491,19 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
                                             ),
                                             title: Text(
                                               '$nombre $apellidos',
-                                              style: const TextStyle(
-                                                  fontWeight: FontWeight.bold),
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodyLarge
+                                                  ?.copyWith(
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
                                             ),
-                                            subtitle: Text(posicion),
+                                            subtitle: Text(
+                                              posicion,
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodyMedium,
+                                            ),
                                           );
                                         },
                                       );
@@ -533,9 +573,12 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
           children: [
             Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
-                color: Colors.grey,
+                color: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.color, // Color del texto
               ),
             ),
             Text(
