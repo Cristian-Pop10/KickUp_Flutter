@@ -81,14 +81,12 @@ class _ConfiguracionViewState extends State<ConfiguracionView> {
             title: const Text('Términos y condiciones'),
             trailing: const Icon(Icons.arrow_forward_ios, size: 16),
             onTap: () {
-              // Navegar a pantalla de Términos si existe
             },
           ),
           ListTile(
             title: const Text('Política de privacidad'),
             trailing: const Icon(Icons.arrow_forward_ios, size: 16),
             onTap: () {
-              // Navegar a pantalla de Privacidad si existe
             },
           ),
         ],

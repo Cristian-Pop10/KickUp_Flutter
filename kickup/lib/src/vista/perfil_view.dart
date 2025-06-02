@@ -520,28 +520,84 @@ class _PerfilViewState extends State<PerfilView> {
                                         ),
                                       ],
                                     )
-                                  : Column(
+                                  : Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
                                       children: [
-                                        Text(
-                                          _usuario!.nombre ?? '',
-                                          style: const TextStyle(
-                                            fontSize: 24,
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                        Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              _usuario!.nombre ?? '',
+                                              style: const TextStyle(
+                                                fontSize: 24,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            Text(
+                                              _usuario!.apellidos ?? '',
+                                              style: const TextStyle(
+                                                fontSize: 20,
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                        Text(
-                                          _usuario!.apellidos ?? '',
-                                          style: const TextStyle(
-                                            fontSize: 20,
+                                        const SizedBox(
+                                            width:
+                                                16), // Espacio entre nombre y puntos
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 12, vertical: 8),
+                                          decoration: BoxDecoration(
+                                            color: const Color.fromARGB(
+                                                255, 111, 44, 81),
+                                            borderRadius:
+                                                BorderRadius.circular(20),
+                                          ),
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                'Puntos',
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 16,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  const Icon(Icons.storm,
+                                                      color: Colors.white,
+                                                      size: 20),
+                                                  const SizedBox(width: 6),
+                                                  Text(
+                                                    (_usuario!.puntos ?? 15)
+                                                        .toString(),
+                                                    style: const TextStyle(
+                                                      color: Colors.white,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 18,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ],
                                     ),
+
                               const SizedBox(height: 16),
                               // Botón Editar Perfil
                               Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.center,
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   TextButton(
                                     onPressed: () {
@@ -633,7 +689,16 @@ class _PerfilViewState extends State<PerfilView> {
                                 keyboardType: TextInputType.emailAddress,
                                 isRequired: true,
                               ),
-                              const SizedBox(height: 32),
+                              const SizedBox(height: 35),
+                              Text(
+                                  "Cada penalización que recibas se restará a tus puntos totales",
+                                  style: TextStyle(
+                                    color: Theme.of(context)
+                                        .textTheme
+                                        .bodyLarge
+                                        ?.color,
+                                  )),
+                              const SizedBox(height: 16),
                               // Botón Guardar cambios (solo visible en modo edición)
                               if (_isEditing)
                                 SizedBox(

@@ -53,7 +53,7 @@ class _RegistroViewState extends State<RegistroView> {
         _isLoading = true;
       });
 
-      final signupModel = SignupModel(
+      SignupModel(
         email: _emailController.text,
         password: _passwordController.text,
       );

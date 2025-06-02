@@ -26,6 +26,8 @@ class EquipoController {
     });
   }
 
+  
+
   // Método para obtener todos los equipos
   Future<List<EquipoModel>> obtenerEquipos() async {
     try {
