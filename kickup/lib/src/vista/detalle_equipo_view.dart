@@ -30,6 +30,7 @@ class _DetalleEquipoViewState extends State<DetalleEquipoView> {
   bool _esMiembro = false;
   bool _esCreador = false;
   bool _procesandoSolicitud = false;
+  bool _isAdmin = false; // Variable para verificar si el usuario es admin
 
   @override
   void initState() {
@@ -39,151 +40,218 @@ class _DetalleEquipoViewState extends State<DetalleEquipoView> {
 
   /// Carga la información del equipo y determina el rol del usuario
   Future<void> _cargarEquipo() async {
-    setState(() {
-      _isLoading = true;
-    });
+  setState(() {
+    _isLoading = true;
+  });
 
-    try {
-      final equipo =
-          await _equipoController.obtenerEquipoPorId(widget.equipoId);
+  try {
+    // Obtener datos frescos directamente de Firestore
+    final equipoDoc = await FirebaseFirestore.instance
+        .collection('equipos')
+        .doc(widget.equipoId)
+        .get();
 
-      if (equipo != null) {
-        // Determinar el rol del usuario en el equipo
-        final esMiembro = equipo.jugadoresIds.contains(widget.userId);
-        final esCreador = equipo.creadorId == widget.userId;
+    if (equipoDoc.exists) {
+      final data = equipoDoc.data() as Map<String, dynamic>;
+      
+      // Crear el modelo del equipo
+      final equipo = EquipoModel.fromJson({
+        'id': equipoDoc.id,
+        ...data,
+      });
 
-        if (mounted) {
-          setState(() {
-            _equipo = equipo;
-            _esMiembro = esMiembro;
-            _esCreador = esCreador;
-            _isLoading = false;
-          });
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No se encontró el equipo')),
-          );
-          Navigator.pop(context);
-        }
-      }
-    } catch (e) {
+      // Determinar el rol del usuario en el equipo
+      final jugadoresIds = List<String>.from(data['jugadoresIds'] ?? []);
+      final esMiembro = jugadoresIds.contains(widget.userId);
+      final esCreador = data['creadorId'] == widget.userId;
+      final isAdmin = await _equipoController.esUsuarioAdmin(widget.userId);
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
-        );
         setState(() {
+          _equipo = equipo;
+          _esMiembro = esMiembro;
+          _esCreador = esCreador;
+          _isAdmin = isAdmin;
           _isLoading = false;
         });
       }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se encontró el equipo')),
+        );
+        Navigator.pop(context);
+      }
+    }
+  } catch (e) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString()}')),
+      );
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
+}
 
-  // Corregir el método _abandonarEquipo() para actualizar el estado inmediatamente
-  Future<void> _abandonarEquipo() async {
-    if (_procesandoSolicitud) return;
-
-    // Mostrar diálogo de confirmación
-    final bool? confirmar = await _mostrarDialogoConfirmacion();
-    if (confirmar != true) return;
-
+  /// Fuerza la actualización de los StreamBuilders
+void _forzarActualizacion() {
+  if (mounted) {
     setState(() {
-      _procesandoSolicitud = true;
+      // Esto fuerza una reconstrucción de todos los widgets
     });
+  }
+}
 
-    try {
-      final resultado = await _equipoController.abandonarEquipo(
-          widget.equipoId, widget.userId);
+  /// Abandona el equipo y actualiza el estado inmediatamente
+Future<void> _abandonarEquipo() async {
+  if (_procesandoSolicitud) return;
 
-      if (resultado && mounted) {
-        // Actualizar el estado inmediatamente sin esperar a recargar
-        setState(() {
-          _esMiembro = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Has abandonado el equipo correctamente'),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-            ),
-            behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.all(16),
+  // Mostrar diálogo de confirmación
+  final bool? confirmar = await _mostrarDialogoConfirmacion();
+  if (confirmar != true) return;
+
+  setState(() {
+    _procesandoSolicitud = true;
+  });
+
+  try {
+    final resultado = await _equipoController.abandonarEquipo(
+        widget.equipoId, widget.userId);
+
+    if (resultado && mounted) {
+      // Actualizar Firestore inmediatamente para forzar la actualización de los StreamBuilders
+      await FirebaseFirestore.instance
+          .collection('equipos')
+          .doc(widget.equipoId)
+          .update({
+        'jugadoresIds': FieldValue.arrayRemove([widget.userId]),
+        'jugadores': FieldValue.arrayRemove([
+          // Necesitamos encontrar y remover el objeto completo del jugador
+          // Esto se manejará en el controlador, pero forzamos la actualización aquí
+        ]),
+        'lastUpdated': FieldValue.serverTimestamp(),
+      });
+
+      // Actualizar el estado local inmediatamente
+      setState(() {
+        _esMiembro = false;
+        _procesandoSolicitud = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Has abandonado el equipo correctamente'),
+          backgroundColor: const Color.fromARGB(255, 224, 45, 0),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
           ),
-        );
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+        ),
+      );
 
-        // Recargar datos en segundo plano para actualizar el resto de la información
-        _cargarEquipo();
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo procesar la solicitud')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _procesandoSolicitud = false;
-        });
-      }
+      // Recargar datos para asegurar consistencia
+      await _cargarEquipo();
+    } else if (mounted) {
+      setState(() {
+        _procesandoSolicitud = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo procesar la solicitud')),
+      );
+    }
+  } catch (e) {
+    if (mounted) {
+      setState(() {
+        _procesandoSolicitud = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString()}')),
+      );
     }
   }
+}
 
-// También corregir el método _unirseAlEquipo() de manera similar
-  Future<void> _unirseAlEquipo() async {
-    if (_procesandoSolicitud) return;
+/// Se une al equipo y actualiza el estado inmediatamente
+Future<void> _unirseAlEquipo() async {
+  if (_procesandoSolicitud) return;
 
-    setState(() {
-      _procesandoSolicitud = true;
-    });
+  setState(() {
+    _procesandoSolicitud = true;
+  });
 
-    try {
-      final resultado =
-          await _equipoController.unirseEquipo(widget.equipoId, widget.userId);
+  try {
+    final resultado =
+        await _equipoController.unirseEquipo(widget.equipoId, widget.userId);
 
-      if (resultado && mounted) {
-        // Actualizar el estado inmediatamente
-        setState(() {
-          _esMiembro = true;
+    if (resultado && mounted) {
+      // Obtener datos del usuario para la actualización
+      final userDoc = await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(widget.userId)
+          .get();
+      
+      if (userDoc.exists) {
+        final userData = userDoc.data() as Map<String, dynamic>;
+        
+        // Actualizar Firestore inmediatamente
+        await FirebaseFirestore.instance
+            .collection('equipos')
+            .doc(widget.equipoId)
+            .update({
+          'jugadoresIds': FieldValue.arrayUnion([widget.userId]),
+          'jugadores': FieldValue.arrayUnion([{
+            'id': widget.userId,
+            'nombre': userData['nombre'] ?? '',
+            'apellidos': userData['apellidos'] ?? '',
+            'posicion': userData['posicion'] ?? 'Sin posición',
+            'puntos': userData['puntos'] ?? 15,
+          }]),
+          'lastUpdated': FieldValue.serverTimestamp(),
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Te has unido al equipo correctamente'),
-            backgroundColor: Colors.green,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-            ),
-            behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.all(16),
+      }
+
+      // Actualizar el estado local inmediatamente
+      setState(() {
+        _esMiembro = true;
+        _procesandoSolicitud = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Te has unido al equipo correctamente'),
+          backgroundColor: Colors.green,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
           ),
-        );
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+        ),
+      );
 
-        // Recargar datos en segundo plano
-        _cargarEquipo();
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo procesar la solicitud')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _procesandoSolicitud = false;
-        });
-      }
+      // Recargar datos para asegurar consistencia
+      await _cargarEquipo();
+    } else if (mounted) {
+      setState(() {
+        _procesandoSolicitud = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo procesar la solicitud')),
+      );
+    }
+  } catch (e) {
+    if (mounted) {
+      setState(() {
+        _procesandoSolicitud = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString()}')),
+      );
     }
   }
+}
 
   /// Muestra diálogo de confirmación para abandonar equipo
   Future<bool?> _mostrarDialogoConfirmacion() {
@@ -212,7 +280,8 @@ class _DetalleEquipoViewState extends State<DetalleEquipoView> {
 
   /// Muestra opciones para cambiar el logo del equipo
   Future<void> _mostrarOpcionesCambiarLogo() async {
-    if (!_esCreador) return;
+    // Cambio: Permitir a cualquier miembro del equipo cambiar el logo
+    if (!_esMiembro) return;
 
     final ImageSource? source = await showModalBottomSheet<ImageSource>(
       context: context,
@@ -435,13 +504,15 @@ class _DetalleEquipoViewState extends State<DetalleEquipoView> {
           }
 
           return GestureDetector(
-            onTap: _esCreador ? _mostrarOpcionesCambiarLogo : null,
+            // Cambio: Permitir a cualquier miembro del equipo cambiar el logo
+            onTap: _esMiembro ? _mostrarOpcionesCambiarLogo : null,
             child: Container(
               width: 150,
               height: 150,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(15),
-                border: _esCreador
+                // Cambio: Mostrar borde especial para cualquier miembro
+                border: _esMiembro
                     ? Border.all(
                         color: Theme.of(context).colorScheme.primary,
                         width: 3,
@@ -474,8 +545,8 @@ class _DetalleEquipoViewState extends State<DetalleEquipoView> {
                           : _buildDefaultLogo(),
                     ),
                   ),
-                  // Indicador de edición para creadores
-                  if (_esCreador)
+                  // Cambio: Mostrar indicador de edición para cualquier miembro
+                  if (_esMiembro)
                     Positioned(
                       bottom: 8,
                       right: 8,
@@ -673,44 +744,40 @@ class _DetalleEquipoViewState extends State<DetalleEquipoView> {
     );
   }
 
-  /// Construye el botón de acción principal
+  /// Construye el botón de acción (Unirse o Abandonar)
   Widget _buildActionButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 50,
-      child: ElevatedButton(
-        onPressed: _procesandoSolicitud
-            ? null
-            : (_esMiembro ? _abandonarEquipo : _unirseAlEquipo),
-        style: ElevatedButton.styleFrom(
-          backgroundColor:
-              _esMiembro ? Colors.red : Theme.of(context).colorScheme.primary,
-          foregroundColor: Colors.white,
-          disabledBackgroundColor: Colors.grey,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(25),
+    if (_isAdmin) return const SizedBox.shrink(); // Oculta todo si es admin
+
+    if (_esMiembro) {
+      return Center(
+        child: ElevatedButton.icon(
+          icon: const Icon(Icons.exit_to_app),
+          label: const Text('Abandonar equipo'),
+          onPressed: _abandonarEquipo,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.red,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
-          elevation: _esMiembro ? 2 : 1,
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (_esMiembro) ...[
-              const Icon(Icons.exit_to_app, size: 20),
-              const SizedBox(width: 8),
-            ],
-            Text(
-              _procesandoSolicitud
-                  ? 'Procesando...'
-                  : (_esMiembro ? 'Abandonar equipo' : 'Unirse al equipo'),
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
+      );
+    } else {
+      return Center(
+        child: ElevatedButton.icon(
+          icon: const Icon(Icons.group_add),
+          label: const Text('Unirse al equipo'),
+          onPressed: _unirseAlEquipo,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.green,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
         ),
-      ),
-    );
+      );
+    }
   }
 }

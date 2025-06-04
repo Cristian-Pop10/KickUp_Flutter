@@ -2,11 +2,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:kickup/src/componentes/app_styles.dart';
+import 'package:kickup/src/vista/crear_pista_view.dart';
 import '../componentes/bottom_nav_bar.dart';
 import '../controlador/pista_controller.dart';
 import '../modelo/pista_model.dart';
 import 'detalle_pista_view.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class PistasView extends StatefulWidget {
   const PistasView({Key? key}) : super(key: key);
@@ -18,28 +20,47 @@ class PistasView extends StatefulWidget {
 class _PistasViewState extends State<PistasView> {
   // Controlador para manejar la lógica de pistas
   final PistaController _pistaController = PistaController();
-  
+  final TextEditingController _searchController = TextEditingController();
+
   // Variables de estado principales
   List<PistaModel> _pistas = [];
+  List<PistaModel> _pistasFiltradas = [];
+  List<String> _pistasSeleccionadas = [];
   bool _isLoading = true;
-  bool _mostrarMapa = false;        // Toggle entre vista lista/mapa
-  Set<Marker> _markers = {};        // Marcadores para Google Maps
+  bool _mostrarMapa = false; // Toggle entre vista lista/mapa
+  Set<Marker> _markers = {}; // Marcadores para Google Maps
   GoogleMapController? _mapController;
   late final String? userId;
+  bool _esAdmin = false; // Indica si el usuario es administrador
+  bool _modoSeleccion = false; // Modo selección para eliminar pistas
 
   @override
   void initState() {
     super.initState();
     userId = FirebaseAuth.instance.currentUser?.uid;
-    _requestLocationPermission();   // Solicitar permisos de ubicación
-    _cargarPistas();
+    _requestLocationPermission(); // Solicitar permisos de ubicación
+    _verificarPermisos();
+    _searchController.addListener(_filtrarPistas);
   }
 
   @override
   void dispose() {
-    // Limpiar controlador del mapa para evitar memory leaks
+    // Limpiar controladores para evitar memory leaks
     _mapController?.dispose();
+    _searchController.dispose();
     super.dispose();
+  }
+
+  /// Verifica si el usuario es admin
+  Future<void> _verificarPermisos() async {
+    if (userId != null) {
+      // Asumimos que existe un método similar al de equipos para verificar si es admin
+      final esAdmin = await _pistaController.esUsuarioAdmin(userId!);
+      setState(() {
+        _esAdmin = esAdmin;
+      });
+    }
+    _cargarPistas();
   }
 
   /// Solicita permisos de ubicación al usuario
@@ -58,7 +79,7 @@ class _PistasViewState extends State<PistasView> {
 
     try {
       final pistas = await _pistaController.obtenerPistas();
-      
+
       // Crear marcadores para cada pista
       final markers = pistas.map((pista) {
         return Marker(
@@ -71,15 +92,18 @@ class _PistasViewState extends State<PistasView> {
           ),
           // Color del marcador según disponibilidad
           icon: BitmapDescriptor.defaultMarkerWithHue(
-            pista.disponible ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueRed,
+            pista.disponible
+                ? BitmapDescriptor.hueGreen
+                : BitmapDescriptor.hueRed,
           ),
         );
       }).toSet();
-      
+
       // Verificar que el widget sigue montado antes de actualizar estado
       if (mounted) {
         setState(() {
           _pistas = pistas;
+          _pistasFiltradas = pistas;
           _markers = markers;
           _isLoading = false;
         });
@@ -97,6 +121,19 @@ class _PistasViewState extends State<PistasView> {
     }
   }
 
+  /// Filtra pistas basado en el texto de búsqueda
+  void _filtrarPistas() {
+    final query = _searchController.text.toLowerCase();
+    setState(() {
+      _pistasFiltradas = _pistas
+          .where((pista) =>
+              pista.nombre.toLowerCase().contains(query) ||
+              pista.direccion.toLowerCase().contains(query) ||
+              (pista.tipo?.toLowerCase().contains(query) ?? false))
+          .toList();
+    });
+  }
+
   /// Navega al detalle de la pista y recarga al volver
   Future<void> _navegarADetallePista(String pistaId) async {
     await Navigator.push(
@@ -109,6 +146,105 @@ class _PistasViewState extends State<PistasView> {
       ),
     );
     _cargarPistas(); // Recargar pistas al volver
+  }
+
+  /// Navega a crear pista y recarga si se creó exitosamente
+  Future<void> _navegarACrearPista() async {
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => CrearPistaView(userId: userId!),
+      ),
+    );
+
+    if (result == true) {
+      _cargarPistas();
+    }
+  }
+
+  /// Activa/desactiva modo selección (solo admin)
+  void _toggleModoSeleccion() {
+    if (!_esAdmin) return;
+
+    setState(() {
+      _modoSeleccion = !_modoSeleccion;
+      if (!_modoSeleccion) {
+        _pistasSeleccionadas.clear();
+      }
+    });
+  }
+
+  /// Selecciona/deselecciona una pista (solo admin)
+  void _toggleSeleccionPista(String pistaId) {
+    if (!_esAdmin || !_modoSeleccion) return;
+
+    setState(() {
+      if (_pistasSeleccionadas.contains(pistaId)) {
+        _pistasSeleccionadas.remove(pistaId);
+      } else {
+        _pistasSeleccionadas.add(pistaId);
+      }
+    });
+  }
+
+  /// Elimina las pistas seleccionadas (solo admin)
+  Future<void> _eliminarPistasSeleccionadas() async {
+    if (!_esAdmin || _pistasSeleccionadas.isEmpty) return;
+
+    final confirmar = await _mostrarDialogoConfirmacion(
+      '¿Eliminar pistas?',
+      '¿Estás seguro de que quieres eliminar ${_pistasSeleccionadas.length} pista(s)?',
+    );
+
+    if (confirmar) {
+      setState(() {
+        _isLoading = true;
+      });
+
+      // Asumimos que existe un método similar al de equipos para eliminar múltiples pistas
+      final eliminadas = await _pistaController.eliminarPistasMultiples(
+        _pistasSeleccionadas,
+        userId!,
+      );
+
+      setState(() {
+        _pistasSeleccionadas.clear();
+        _modoSeleccion = false;
+        _isLoading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$eliminadas pista(s) eliminada(s)'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      _cargarPistas();
+    }
+  }
+
+  /// Muestra diálogo de confirmación
+  Future<bool> _mostrarDialogoConfirmacion(
+      String titulo, String mensaje) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(titulo),
+            content: Text(mensaje),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancelar'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: const Text('Eliminar'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
   }
 
   /// Maneja la navegación del BottomNavBar
@@ -127,152 +263,273 @@ class _PistasViewState extends State<PistasView> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(60),
-        child: _buildAppBar(),
-      ),
-      body: Container(
-        margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-        decoration: BoxDecoration(
-          color: AppColors.background(context),
-          borderRadius: BorderRadius.circular(20),
+    return PopScope(
+      canPop: !_modoSeleccion,
+      // ignore: deprecated_member_use
+      onPopInvoked: (didPop) {
+        if (!didPop && _modoSeleccion) {
+          setState(() {
+            _modoSeleccion = false;
+            _pistasSeleccionadas.clear();
+          });
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background(context),
+        body: Container(
+          margin: const EdgeInsets.fromLTRB(16, 60, 16, 16),
+          decoration: BoxDecoration(
+            color: AppColors.fieldBackground(context),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: 16),
+              _buildHeader(), // Header con título
+              // Solo mostrar buscador si NO está en modo mapa o si es admin
+              if (!_mostrarMapa || _esAdmin) _buildSearchBar(),
+              const SizedBox(height: 16),
+              _buildActionButtons(), // Botones de acción
+              const SizedBox(height: 16),
+              _buildContent(), // Contenido principal (lista o mapa)
+            ],
+          ),
         ),
-        child: _buildBody(),
-      ),
-      bottomNavigationBar: BottomNavBar(
-        currentIndex: 2, // Índice fijo para pistas
-        onTap: _onNavItemTapped,
+        bottomNavigationBar: BottomNavBar(
+          currentIndex: 2,
+          onTap: _onNavItemTapped,
+        ),
       ),
     );
   }
 
-  /// Construye el AppBar personalizado con botones de acción
-  Widget _buildAppBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-      ),
-      child: SafeArea(
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            // Título de la pantalla
-            Text(
-              'Pistas',
-              style: TextStyle(
-                color: AppColors.textPrimary(context),
-                fontWeight: FontWeight.bold,
-                fontSize: 22,
+  /// Construye el header con título
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Pistas',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
+              if (_esAdmin)
+                Text(
+                  _modoSeleccion ? 'Modo Eliminación' : 'Administrador',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: _modoSeleccion ? Colors.red[700] : Colors.green[700],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+            ],
+          ),
+          // Mostrar controles de vista para usuarios normales, avatar para admin
+          if (!_esAdmin)
+            StreamBuilder<DocumentSnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('usuarios')
+                  .doc(userId)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const CircleAvatar(
+                    radius: 20,
+                    backgroundColor: Colors.grey,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  );
+                }
+
+                String? imageUrl ;
+                if (snapshot.hasData && snapshot.data!.data() != null) {
+                  final data = snapshot.data!.data() as Map<String, dynamic>;
+                  imageUrl = data['profileImageUrl'] as String?;
+                }
+
+                return Row(
+                  children: [
+                    // Botones de control de vista
+                    _buildActionButton(
+                      icon: _mostrarMapa ? Icons.list : Icons.map,
+                      onPressed: () {
+                        setState(() {
+                          _mostrarMapa = !_mostrarMapa;
+                        });
+                      },
+                      tooltip: _mostrarMapa ? 'Ver lista' : 'Ver mapa',
+                    ),
+                    const SizedBox(width: 8),
+                    _buildActionButton(
+                      icon: Icons.refresh,
+                      onPressed: _cargarPistas,
+                      tooltip: 'Refrescar',
+                    ),
+                    const SizedBox(width: 12),
+                  ],
+                );
+              },
             ),
-            // Botones de acción
-            Row(
-              children: [
-                // Botón toggle lista/mapa
-                _buildActionButton(
-                  icon: _mostrarMapa ? Icons.list : Icons.map,
-                  onPressed: () {
-                    setState(() {
-                      _mostrarMapa = !_mostrarMapa;
-                    });
-                  },
-                  tooltip: _mostrarMapa ? 'Ver lista' : 'Ver mapa',
-                ),
-                const SizedBox(width: 12),
-                // Botón refrescar
-                _buildActionButton(
-                  icon: Icons.refresh,
-                  onPressed: _cargarPistas,
-                  tooltip: 'Refrescar',
-                ),
-              ],
+        ],
+      ),
+    );
+  }
+
+  /// Construye la barra de búsqueda con estilo personalizado
+  Widget _buildSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Container(
+        height: 50,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withAlpha(51),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
             ),
           ],
+          borderRadius: BorderRadius.circular(25),
+        ),
+        child: TextField(
+          controller: _searchController,
+          decoration: InputDecoration(
+            hintText: 'Buscar pistas...',
+            hintStyle: TextStyle(color: Theme.of(context).hintColor),
+            prefixIcon:
+                Icon(Icons.search, color: Theme.of(context).iconTheme.color),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(20),
+              borderSide: BorderSide.none,
+            ),
+            contentPadding: const EdgeInsets.symmetric(vertical: 15),
+            filled: true,
+            fillColor: Theme.of(context).scaffoldBackgroundColor,
+          ),
         ),
       ),
     );
   }
 
-  /// Construye botones de acción con soporte para modo oscuro
+  /// Construye botones de acción pequeños
   Widget _buildActionButton({
     required IconData icon,
     required VoidCallback onPressed,
     required String tooltip,
   }) {
-    // Detectar si estamos en modo oscuro
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Container(
       decoration: BoxDecoration(
-        // Color adaptativo según el tema
-        color: isDarkMode 
-            ? Colors.white.withAlpha(25)  // Blanco semi-transparente para modo oscuro
-            : Colors.grey[200],           // Gris claro para modo claro
-        borderRadius: BorderRadius.circular(12),
+        color: isDarkMode ? Colors.white.withAlpha(25) : Colors.grey[200],
+        borderRadius: BorderRadius.circular(8),
       ),
       child: IconButton(
         icon: Icon(
           icon,
           color: Theme.of(context).iconTheme.color,
-          size: 24,
+          size: 20,
         ),
         onPressed: onPressed,
         tooltip: tooltip,
-        padding: const EdgeInsets.all(8),
-        constraints: const BoxConstraints(),
+        padding: const EdgeInsets.all(6),
+        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
       ),
     );
   }
 
-  /// Construye el cuerpo principal con diferentes estados
-  Widget _buildBody() {
-    // Estado de carga
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    // Estado vacío
-    if (_pistas.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+  /// Construye los botones de acción (diferentes para usuario y admin)
+  Widget _buildActionButtons() {
+    if (_esAdmin) {
+      // Vista de administrador: botones circulares verde (+) y rojo (-)
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        child: Row(
           children: [
-            Icon(
-              Icons.sports_soccer,
-              size: 64,
-              color: Colors.grey[400],
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'No hay pistas disponibles',
-              style: TextStyle(fontSize: 18),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _cargarPistas,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                foregroundColor: Theme.of(context).colorScheme.onPrimary,
+            // Botón añadir (verde)
+            Expanded(
+              child: Container(
+                height: 50,
+                margin: const EdgeInsets.only(right: 8),
+                child: ElevatedButton(
+                  onPressed: _modoSeleccion ? null : _navegarACrearPista,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor:
+                        _modoSeleccion ? Colors.grey : Colors.green,
+                    foregroundColor: Colors.white,
+                    shape: const CircleBorder(),
+                  ),
+                  child: const Icon(Icons.add, size: 24),
+                ),
               ),
-              child: const Text('Reintentar'),
+            ),
+            // Botón eliminar (rojo)
+            Expanded(
+              child: Container(
+                height: 50,
+                margin: const EdgeInsets.only(left: 8),
+                child: ElevatedButton(
+                  onPressed: _modoSeleccion
+                      ? _eliminarPistasSeleccionadas
+                      : _toggleModoSeleccion,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor:
+                        _modoSeleccion ? Colors.red[700] : Colors.red,
+                    foregroundColor: Colors.white,
+                    shape: const CircleBorder(),
+                  ),
+                  child: Icon(
+                    _modoSeleccion ? Icons.delete : Icons.remove,
+                    size: 24,
+                  ),
+                ),
+              ),
             ),
           ],
         ),
       );
-    }
+    } else {
+    // Vista de usuario normal: sin botones
+    return const SizedBox.shrink();
+  }
+  }
 
-    // Mostrar mapa o lista según el estado
-    return _mostrarMapa
-        ? ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: _buildMapa(),
-          )
-        : _buildLista();
+  /// Construye el contenido principal (lista o mapa)
+  Widget _buildContent() {
+    return Expanded(
+      child: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _pistasFiltradas.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.sports_soccer,
+                        size: 64,
+                        color: Colors.grey[400],
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        _searchController.text.isEmpty
+                            ? 'No hay pistas disponibles'
+                            : 'No se encontraron pistas',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : _mostrarMapa
+                  ? _buildMapa()
+                  : _buildLista(),
+    );
   }
 
   /// Construye la vista de lista con pull-to-refresh
@@ -280,10 +537,10 @@ class _PistasViewState extends State<PistasView> {
     return RefreshIndicator(
       onRefresh: _cargarPistas,
       child: ListView.builder(
-        padding: const EdgeInsets.all(8),
-        itemCount: _pistas.length,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: _pistasFiltradas.length,
         itemBuilder: (context, index) {
-          final pista = _pistas[index];
+          final pista = _pistasFiltradas[index];
           return _buildPistaCard(pista);
         },
       ),
@@ -294,62 +551,85 @@ class _PistasViewState extends State<PistasView> {
   Widget _buildMapa() {
     // Ubicación por defecto (Madrid)
     const LatLng defaultLocation = LatLng(40.416775, -3.703790);
-    
+
     // Usar la primera pista como ubicación inicial si está disponible
-    final LatLng initialLocation = _pistas.isNotEmpty 
-        ? LatLng(_pistas.first.latitud, _pistas.first.longitud)
+    final LatLng initialLocation = _pistasFiltradas.isNotEmpty
+        ? LatLng(
+            _pistasFiltradas.first.latitud, _pistasFiltradas.first.longitud)
         : defaultLocation;
-    
-    return GoogleMap(
-      initialCameraPosition: CameraPosition(
-        target: initialLocation,
-        zoom: 12,
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(15),
+        child: GoogleMap(
+          initialCameraPosition: CameraPosition(
+            target: initialLocation,
+            zoom: 12,
+          ),
+          markers: _markers,
+          myLocationEnabled: true,
+          myLocationButtonEnabled: true,
+          mapType: MapType.normal,
+          zoomControlsEnabled: true,
+          compassEnabled: true,
+          onMapCreated: (GoogleMapController controller) {
+            _mapController = controller;
+
+            if (_pistasFiltradas.isNotEmpty) {
+              controller.animateCamera(
+                CameraUpdate.newLatLngZoom(
+                  LatLng(_pistasFiltradas.first.latitud,
+                      _pistasFiltradas.first.longitud),
+                  12,
+                ),
+              );
+            }
+          },
+        ),
       ),
-      markers: _markers,                    // Marcadores de las pistas
-      myLocationEnabled: true,              // Mostrar ubicación del usuario
-      myLocationButtonEnabled: true,        // Botón para centrar en ubicación
-      mapType: MapType.normal,
-      zoomControlsEnabled: true,
-      compassEnabled: true,
-      onMapCreated: (GoogleMapController controller) {
-        _mapController = controller;
-        
-        // Centrar el mapa en la primera pista si hay pistas disponibles
-        if (_pistas.isNotEmpty) {
-          controller.animateCamera(
-            CameraUpdate.newLatLngZoom(
-              LatLng(_pistas.first.latitud, _pistas.first.longitud),
-              12,
-            ),
-          );
-        }
-      },
     );
   }
 
   /// Construye una tarjeta individual de pista
   Widget _buildPistaCard(PistaModel pista) {
-    return Card(
-      color: AppColors.fieldBackground(context),
-      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(15),
-      ),
-      elevation: 3,
-      child: InkWell(
-        onTap: () => _navegarADetallePista(pista.id),
-        borderRadius: BorderRadius.circular(15),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildPistaImage(pista),      // Imagen de la pista
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildPistaInfo(pista), // Información de la pista
-              ),
-            ],
+    final isSelected = _pistasSeleccionadas.contains(pista.id);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Card(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15),
+          side: isSelected
+              ? BorderSide(color: Colors.blue, width: 2)
+              : BorderSide.none,
+        ),
+        elevation: 2,
+        child: InkWell(
+          onTap: () => _modoSeleccion
+              ? _toggleSeleccionPista(pista.id)
+              : _navegarADetallePista(pista.id),
+          onLongPress: _esAdmin ? () => _toggleModoSeleccion() : null,
+          borderRadius: BorderRadius.circular(15),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildPistaImage(pista),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: _buildPistaInfo(pista),
+                ),
+                if (_esAdmin && _modoSeleccion)
+                  Checkbox(
+                    value: isSelected,
+                    onChanged: (_) => _toggleSeleccionPista(pista.id),
+                    activeColor: Colors.blue,
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -362,19 +642,20 @@ class _PistasViewState extends State<PistasView> {
       width: 80,
       height: 80,
       decoration: BoxDecoration(
-        color: AppColors.cardBackground(context),
+        color: Colors.grey[200],
         borderRadius: BorderRadius.circular(8),
-        // Mostrar imagen si existe
         image: pista.imagenUrl != null && pista.imagenUrl!.isNotEmpty
             ? DecorationImage(
                 image: pista.imagenUrl!.startsWith('assets/')
                     ? AssetImage(pista.imagenUrl!) as ImageProvider
                     : NetworkImage(pista.imagenUrl!),
                 fit: BoxFit.cover,
+                onError: (exception, stackTrace) {
+                  // Manejar error de carga de imagen
+                },
               )
             : null,
       ),
-      // Mostrar icono por defecto si no hay imagen
       child: pista.imagenUrl == null || pista.imagenUrl!.isEmpty
           ? const Icon(
               Icons.sports_soccer,
@@ -402,7 +683,6 @@ class _PistasViewState extends State<PistasView> {
                 ),
               ),
             ),
-            // Badge de disponibilidad
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
@@ -420,40 +700,41 @@ class _PistasViewState extends State<PistasView> {
           ],
         ),
         const SizedBox(height: 4),
-        
+
         // Tipo de pista (si existe)
         if (pista.tipo != null && pista.tipo!.isNotEmpty)
           Text(
             pista.tipo!,
             style: TextStyle(
               fontSize: 14,
-              color: Theme.of(context).textTheme.bodyMedium?.color ?? Colors.grey,
+              color: Colors.green[700],
+              fontWeight: FontWeight.bold,
             ),
           ),
         const SizedBox(height: 4),
-        
+
         // Dirección con icono
         Row(
           children: [
-            const Icon(Icons.location_on, size: 16),
+            const Icon(Icons.location_on, size: 16, color: Colors.grey),
             const SizedBox(width: 4),
             Expanded(
               child: Text(
                 pista.direccion,
-                style: const TextStyle(fontSize: 14),
+                style: const TextStyle(fontSize: 14, color: Colors.grey),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
         ),
-        
+
         // Precio (si existe)
         if (pista.precio != null) ...[
           const SizedBox(height: 4),
           Row(
             children: [
-              const Icon(Icons.euro, size: 16),
+              const Icon(Icons.euro, size: 16, color: Colors.grey),
               const SizedBox(width: 4),
               Text(
                 '${pista.precio}€',

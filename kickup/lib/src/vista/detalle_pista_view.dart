@@ -30,6 +30,8 @@ class _DetallePistaViewState extends State<DetallePistaView> {
   Set<Marker> _markers = {};
   GoogleMapController? _mapController;
 
+  bool esAdmin = false; 
+
   @override
   void initState() {
     super.initState();

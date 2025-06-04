@@ -26,6 +26,7 @@ class EquipoController {
     });
   }
 
+  // MÉTODOS EXISTENTES (mantener todos los que ya tienes)
   
 
   // Método para obtener todos los equipos
@@ -209,11 +210,6 @@ class EquipoController {
     }
   }
 
-  // Método para cerrar el stream controller
-  void dispose() {
-    _equiposStreamController.close();
-  }
-
   // Método para actualizar el logo de un equipo
   Future<void> actualizarLogoEquipo(String equipoId, String logoUrl) async {
     await FirebaseFirestore.instance
@@ -222,5 +218,118 @@ class EquipoController {
         .update({
       'logoUrl': logoUrl,
     });
+  }
+
+  // ========== MÉTODOS DE ADMINISTRADOR ==========
+
+  // Método para verificar si el usuario es admin
+  Future<bool> esUsuarioAdmin(String userId) async {
+    try {
+      final userDoc = await _firestore.collection('usuarios').doc(userId).get();
+      if (userDoc.exists) {
+        final userData = userDoc.data() as Map<String, dynamic>;
+        return userData['esAdmin'] == true || userData['rol'] == 'admin';
+      }
+      return false;
+    } catch (e) {
+      print('Error al verificar admin: $e');
+      return false;
+    }
+  }
+
+  // Método para eliminar un equipo (solo admin)
+  Future<bool> eliminarEquipo(String equipoId, String userId) async {
+    try {
+      // Verificar permisos de admin
+      final esAdmin = await esUsuarioAdmin(userId);
+      if (!esAdmin) {
+        print('Usuario no tiene permisos de administrador');
+        return false;
+      }
+
+      // Eliminar el equipo
+      await _firestore.collection('equipos').doc(equipoId).delete();
+      return true;
+    } catch (e) {
+      print('Error al eliminar equipo: $e');
+      return false;
+    }
+  }
+
+  // Método para eliminar múltiples equipos (solo admin)
+  Future<int> eliminarEquiposMultiples(List<String> equiposIds, String userId) async {
+    try {
+      // Verificar permisos de admin
+      final esAdmin = await esUsuarioAdmin(userId);
+      if (!esAdmin) {
+        print('Usuario no tiene permisos de administrador');
+        return 0;
+      }
+
+      int eliminados = 0;
+      final batch = _firestore.batch();
+
+      for (final equipoId in equiposIds) {
+        final equipoRef = _firestore.collection('equipos').doc(equipoId);
+        batch.delete(equipoRef);
+        eliminados++;
+      }
+
+      await batch.commit();
+      return eliminados;
+    } catch (e) {
+      print('Error al eliminar equipos múltiples: $e');
+      return 0;
+    }
+  }
+
+  // Método para obtener estadísticas (solo admin)
+  Future<Map<String, int>> obtenerEstadisticasEquipos(String userId) async {
+    try {
+      // Verificar permisos de admin
+      final esAdmin = await esUsuarioAdmin(userId);
+      if (!esAdmin) {
+        return {'total': 0, 'error': 1};
+      }
+
+      final equipos = await obtenerEquipos();
+      final total = equipos.length;
+      
+      // Contar equipos por tipo
+      final Map<String, int> estadisticas = {
+        'total': total,
+        'futbolSala': 0,
+        'futbol7': 0,
+        'futbol11': 0,
+        'futbolPlaya': 0,
+      };
+
+      for (final equipo in equipos) {
+        switch (equipo.tipo.toLowerCase()) {
+          case 'fútbol sala':
+            estadisticas['futbolSala'] = (estadisticas['futbolSala'] ?? 0) + 1;
+            break;
+          case 'fútbol 7':
+            estadisticas['futbol7'] = (estadisticas['futbol7'] ?? 0) + 1;
+            break;
+          case 'fútbol 11':
+            estadisticas['futbol11'] = (estadisticas['futbol11'] ?? 0) + 1;
+            break;
+          case 'fútbol playa':
+            estadisticas['futbolPlaya'] = (estadisticas['futbolPlaya'] ?? 0) + 1;
+            break;
+        }
+      }
+
+      return estadisticas;
+    } catch (e) {
+      print('Error al obtener estadísticas: $e');
+      return {'total': 0, 'error': 1};
+    }
+  }
+
+  // Método para cerrar el stream controller
+  void dispose() {
+    _equiposStreamController.close();
   }
 }

@@ -26,6 +26,9 @@ dependencies:
   
   # Mapa
   google_maps_flutter: ^2.5.0
+  geolocator: ^14.0.1
+  geocoding: ^4.0.0
+  uuid: ^4.5.1
   location: ^8.0.0
   
   #Permisos

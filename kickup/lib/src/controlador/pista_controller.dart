@@ -7,108 +7,70 @@ class PistaController {
   // Método para obtener todas las pistas
   Future<List<PistaModel>> obtenerPistas() async {
     try {
+      print('PistaController: Obteniendo pistas...');
+      
       // Intentar obtener pistas desde Firestore
       final querySnapshot = await _firestore.collection('pistas').get();
       
       // Si hay pistas en Firestore, devolverlas
       if (querySnapshot.docs.isNotEmpty) {
+        print('PistaController: ${querySnapshot.docs.length} pistas encontradas en Firestore');
         return querySnapshot.docs
-            .map((doc) => PistaModel.fromJson(doc.data()))
+            .map((doc) {
+              try {
+                return PistaModel.fromJson(doc.data());
+              } catch (e) {
+                print('Error al parsear pista ${doc.id}: $e');
+                return null;
+              }
+            })
+            .where((pista) => pista != null)
+            .cast<PistaModel>()
             .toList();
       }
       
       // Si no hay pistas en Firestore, crear algunas de ejemplo y guardarlas
+      print('PistaController: No hay pistas en Firestore, creando ejemplos...');
       final pistasEjemplo = _generarPistasEjemplo();
       
       // Guardar las pistas de ejemplo en Firestore
       for (final pista in pistasEjemplo) {
-        await _firestore.collection('pistas').doc(pista.id).set(pista.toJson());
+        try {
+          await _firestore.collection('pistas').doc(pista.id).set(pista.toJson());
+        } catch (e) {
+          print('Error al guardar pista de ejemplo ${pista.id}: $e');
+        }
       }
       
       return pistasEjemplo;
-    } catch (e) {
+    } catch (e, stackTrace) {
       print('Error al obtener pistas: $e');
+      print('StackTrace: $stackTrace');
       
       // En caso de error, devolver pistas de ejemplo sin guardarlas
       return _generarPistasEjemplo();
     }
   }
 
-  // Método para buscar pistas por texto
-  Future<List<PistaModel>> buscarPistas(String query) async {
-    try {
-      // Obtener todas las pistas
-      List<PistaModel> pistas;
-      
-      try {
-        // Intentar obtener pistas desde Firestore
-        final querySnapshot = await _firestore.collection('pistas').get();
-        
-        if (querySnapshot.docs.isNotEmpty) {
-          pistas = querySnapshot.docs
-              .map((doc) => PistaModel.fromJson(doc.data()))
-              .toList();
-        } else {
-          pistas = _generarPistasEjemplo();
-        }
-      } catch (e) {
-        // En caso de error, usar pistas de ejemplo
-        pistas = _generarPistasEjemplo();
-      }
-      
-      // Si la consulta está vacía, devolver todas las pistas
-      if (query.isEmpty) {
-        return pistas;
-      }
-      
-      // Filtrar las pistas según la consulta
-      final queryLower = query.toLowerCase();
-      return pistas.where((pista) {
-        return pista.nombre.toLowerCase().contains(queryLower) ||
-               pista.direccion.toLowerCase().contains(queryLower) ||
-               (pista.tipo?.toLowerCase().contains(queryLower) ?? false);
-      }).toList();
-    } catch (e) {
-      print('Error al buscar pistas: $e');
-      return [];
-    }
-  }
-
-  // Método para obtener una pista por su ID
-  Future<PistaModel?> obtenerPistaPorId(String pistaId) async {
-    try {
-      // Intentar obtener la pista desde Firestore
-      final doc = await _firestore.collection('pistas').doc(pistaId).get();
-      
-      if (doc.exists) {
-        return PistaModel.fromJson(doc.data()!);
-      }
-      
-      // Si no existe en Firestore, buscar en las pistas de ejemplo
-      final pistasEjemplo = _generarPistasEjemplo();
-      return pistasEjemplo.firstWhere(
-        (pista) => pista.id == pistaId,
-        orElse: () => throw Exception('Pista no encontrada'),
-      );
-    } catch (e) {
-      print('Error al obtener pista: $e');
-      return null;
-    }
-  }
-
   // Método para crear una nueva pista
   Future<bool> crearPista(PistaModel pista) async {
     try {
+      print('PistaController: Creando pista ${pista.id}...');
+      
       // Si no tiene ID, generar uno
       final id = pista.id.isEmpty ? 'pista_${DateTime.now().millisecondsSinceEpoch}' : pista.id;
       final pistaConId = pista.copyWith(id: id);
       
+      print('PistaController: Guardando en Firestore con ID: $id');
+      
       // Guardar la pista en Firestore
       await _firestore.collection('pistas').doc(id).set(pistaConId.toJson());
       
+      print('PistaController: Pista creada exitosamente');
       return true;
-    } catch (e) {
+    } catch (e, stackTrace) {
       print('Error al crear pista: $e');
+      print('StackTrace: $stackTrace');
       return false;
     }
   }
@@ -116,18 +78,117 @@ class PistaController {
   // Método para actualizar una pista
   Future<bool> actualizarPista(PistaModel pista) async {
     try {
+      print('PistaController: Actualizando pista ${pista.id}...');
+      
       // Verificar que la pista tenga ID
       if (pista.id.isEmpty) {
+        print('Error: La pista no tiene ID');
         return false;
       }
       
       // Actualizar la pista en Firestore
       await _firestore.collection('pistas').doc(pista.id).update(pista.toJson());
       
+      print('PistaController: Pista actualizada exitosamente');
       return true;
-    } catch (e) {
+    } catch (e, stackTrace) {
       print('Error al actualizar pista: $e');
+      print('StackTrace: $stackTrace');
       return false;
+    }
+  }
+
+  // Método para eliminar una pista
+  Future<bool> eliminarPista(String pistaId) async {
+    try {
+      print('PistaController: Eliminando pista $pistaId...');
+      
+      // Eliminar la pista de Firestore
+      await _firestore.collection('pistas').doc(pistaId).delete();
+      
+      print('PistaController: Pista eliminada exitosamente');
+      return true;
+    } catch (e, stackTrace) {
+      print('Error al eliminar pista: $e');
+      print('StackTrace: $stackTrace');
+      return false;
+    }
+  }
+
+  // Método para eliminar múltiples pistas
+  Future<int> eliminarPistasMultiples(List<String> pistaIds, String userId) async {
+    int eliminadas = 0;
+    
+    try {
+      print('PistaController: Eliminando ${pistaIds.length} pistas...');
+      
+      // Verificar que el usuario sea administrador
+      if (!await esUsuarioAdmin(userId)) {
+        print('Usuario $userId no es administrador');
+        return 0;
+      }
+      
+      // Eliminar cada pista
+      for (final pistaId in pistaIds) {
+        try {
+          await _firestore.collection('pistas').doc(pistaId).delete();
+          eliminadas++;
+          print('Pista $pistaId eliminada');
+        } catch (e) {
+          print('Error al eliminar pista $pistaId: $e');
+        }
+      }
+      
+      print('PistaController: $eliminadas pistas eliminadas');
+      return eliminadas;
+    } catch (e, stackTrace) {
+      print('Error al eliminar pistas: $e');
+      print('StackTrace: $stackTrace');
+      return eliminadas;
+    }
+  }
+
+  // Método para verificar si un usuario es administrador
+  Future<bool> esUsuarioAdmin(String userId) async {
+    try {
+      print('PistaController: Verificando si usuario $userId es admin...');
+      
+      final doc = await _firestore.collection('usuarios').doc(userId).get();
+      
+      if (doc.exists) {
+        final data = doc.data();
+        final esAdmin = data?['esAdmin'] == true;
+        print('Usuario $userId es admin: $esAdmin');
+        return esAdmin;
+      }
+      
+      print('Usuario $userId no encontrado');
+      return false;
+    } catch (e, stackTrace) {
+      print('Error al verificar permisos de administrador: $e');
+      print('StackTrace: $stackTrace');
+      return false;
+    }
+  }
+
+  // Método para obtener una pista por ID
+  Future<PistaModel?> obtenerPistaPorId(String pistaId) async {
+    try {
+      print('PistaController: Obteniendo pista por ID: $pistaId...');
+      
+      final doc = await _firestore.collection('pistas').doc(pistaId).get();
+      
+      if (doc.exists) {
+        print('PistaController: Pista encontrada: ${doc.id}');
+        return PistaModel.fromJson(doc.data()!);
+      } else {
+        print('PistaController: Pista no encontrada');
+        return null;
+      }
+    } catch (e, stackTrace) {
+      print('Error al obtener pista por ID: $e');
+      print('StackTrace: $stackTrace');
+      return null;
     }
   }
 
@@ -169,66 +230,6 @@ class PistaController {
         precio: 35.0,
         disponible: true,
         imagenUrl: 'assets/pistas/campo3.jpg',
-      ),
-      PistaModel(
-        id: 'pista_4',
-        nombre: 'Pista Cubierta Oria',
-        direccion: 'Plaza del Ayuntamiento, Oria',
-        latitud: 37.4850,
-        longitud: -2.3000,
-        tipo: 'Fútbol Sala',
-        descripcion: 'Pista cubierta para fútbol sala y otros deportes.',
-        precio: 15.0,
-        disponible: true,
-        imagenUrl: 'assets/pistas/campo4.jpg',
-      ),
-      PistaModel(
-        id: 'pista_5',
-        nombre: 'Complejo Deportivo El Contador',
-        direccion: 'Carretera A-334, El Contador',
-        latitud: 37.5000,
-        longitud: -2.1800,
-        tipo: 'Fútbol 7',
-        descripcion: 'Complejo con campo de fútbol 7 y pistas de pádel.',
-        precio: 20.0,
-        disponible: false,
-        imagenUrl: 'assets/pistas/campo5.jpg',
-      ),
-      PistaModel(
-        id: 'pista_6',
-        nombre: 'Campo de Fútbol Chirivel',
-        direccion: 'Calle Deportes, Chirivel',
-        latitud: 37.5950,
-        longitud: -2.2650,
-        tipo: 'Fútbol 11',
-        descripcion: 'Campo de fútbol con césped natural.',
-        precio: 30.0,
-        disponible: true,
-        imagenUrl: 'assets/pistas/campo6.jpg',
-      ),
-      PistaModel(
-        id: 'pista_7',
-        nombre: 'Pista Municipal Albánchez',
-        direccion: 'Calle Mayor, Albánchez',
-        latitud: 37.2850,
-        longitud: -2.1800,
-        tipo: 'Fútbol Sala',
-        descripcion: 'Pista municipal para fútbol sala y baloncesto.',
-        precio: 12.0,
-        disponible: true,
-        imagenUrl: 'assets/pistas/campo7.jpg',
-      ),
-      PistaModel(
-        id: 'pista_8',
-        nombre: 'Campo de Fútbol Uleila',
-        direccion: 'Avenida Andalucía, Uleila del Campo',
-        latitud: 37.1950,
-        longitud: -2.2100,
-        tipo: 'Fútbol 7',
-        descripcion: 'Campo de fútbol 7 con césped artificial de última generación.',
-        precio: 22.0,
-        disponible: true,
-        imagenUrl: 'assets/pistas/campo8.jpg',
       ),
     ];
   }
