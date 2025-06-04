@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application/src/controlador/partido_controller.dart';
-import 'package:flutter_application/src/modelo/partido_model.dart';
-
+import 'package:kickup/src/componentes/app_styles.dart';
+import 'package:kickup/src/controlador/partido_controller.dart';
+import 'package:kickup/src/modelo/partido_model.dart';
+import 'package:kickup/src/servicio/user_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class DetallePartidoView extends StatefulWidget {
   final String partidoId;
@@ -18,10 +20,15 @@ class DetallePartidoView extends StatefulWidget {
 }
 
 class _DetallePartidoViewState extends State<DetallePartidoView> {
+  // Controladores para manejar la lógica 
   final PartidoController _partidoController = PartidoController();
+  final UserService _userService = UserService();
+  
+  // Variables de estado principales
   PartidoModel? _partido;
   bool _isLoading = true;
   bool _usuarioInscrito = false;
+  bool _procesandoSolicitud = false;
 
   @override
   void initState() {
@@ -29,41 +36,62 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
     _cargarPartido();
   }
 
+  /// Carga la información del partido y verifica si el usuario está inscrito
   Future<void> _cargarPartido() async {
     setState(() {
       _isLoading = true;
     });
 
     try {
-      final partido = await _partidoController.obtenerPartidoPorId(widget.partidoId);
-      final inscrito = await _partidoController.verificarInscripcion(widget.partidoId, widget.userId);
+      final partido =
+          await _partidoController.obtenerPartidoPorId(widget.partidoId);
+      final inscrito = await _partidoController.verificarInscripcion(
+          widget.partidoId, widget.userId);
 
-      setState(() {
-        _partido = partido;
-        _usuarioInscrito = inscrito;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
       if (mounted) {
+        setState(() {
+          _partido = partido;
+          _usuarioInscrito = inscrito;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al cargar el partido: ${e.toString()}')),
+          SnackBar(
+              content: Text('Error al cargar el partido: ${e.toString()}')),
         );
       }
     }
   }
 
+  /// Procesa la inscripción del usuario al partido
   Future<void> _inscribirsePartido() async {
+    if (_procesandoSolicitud) return;
+
     setState(() {
-      _isLoading = true;
+      _procesandoSolicitud = true;
     });
 
     try {
-      final success = await _partidoController.inscribirsePartido(widget.partidoId, widget.userId);
+      final user = await _userService.getUser(widget.userId);
+      if (user == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No se pudo obtener el usuario')),
+          );
+        }
+        return;
+      }
 
-      if (success) {
+      final success =
+          await _partidoController.inscribirsePartido(widget.partidoId, user);
+
+      if (success && mounted) {
+        // Actualizar estado inmediatamente para mejor UX
         setState(() {
           _usuarioInscrito = true;
           if (_partido != null) {
@@ -73,61 +101,65 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
             );
           }
         });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Te has inscrito al partido correctamente')),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Error al inscribirse al partido')),
-          );
-        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Te has inscrito al partido correctamente'),
+            backgroundColor: Colors.green,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+
+        // Volver a la pantalla anterior con resultado
+        Navigator.pop(context, true);
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error al inscribirse al partido'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _procesandoSolicitud = false;
+        });
+      }
     }
   }
 
+  /// Procesa el abandono del partido con confirmación
   Future<void> _abandonarPartido() async {
-    // Mostrar diálogo de confirmación
-    final confirmar = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Abandonar partido'),
-        content: const Text('¿Estás seguro de que quieres abandonar este partido?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Abandonar'),
-          ),
-        ],
-      ),
-    );
+    if (_procesandoSolicitud) return;
 
+    // Mostrar diálogo de confirmación
+    final confirmar = await _mostrarDialogoConfirmacion();
     if (confirmar != true) return;
 
     setState(() {
-      _isLoading = true;
+      _procesandoSolicitud = true;
     });
 
     try {
-      final success = await _partidoController.abandonarPartido(widget.partidoId, widget.userId);
+      final success = await _partidoController.abandonarPartido(
+          widget.partidoId, widget.userId);
 
-      if (success) {
+      if (success && mounted) {
+        // Actualizar estado inmediatamente
         setState(() {
           _usuarioInscrito = false;
           if (_partido != null) {
@@ -137,45 +169,94 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
             );
           }
         });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Has abandonado el partido correctamente')),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Error al abandonar el partido')),
-          );
-        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Has abandonado el partido correctamente'),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+
+        Navigator.pop(context, true);
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error al abandonar el partido'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _procesandoSolicitud = false;
+        });
+      }
     }
   }
 
+  /// Muestra diálogo de confirmación para abandonar partido
+  Future<bool?> _mostrarDialogoConfirmacion() {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Abandonar partido'),
+        content:
+            const Text('¿Estás seguro de que quieres abandonar este partido?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Abandonar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Formatea la fecha del partido en formato legible
   String _formatearFecha(DateTime fecha) {
     final dia = fecha.day;
     final mes = _obtenerNombreMes(fecha.month);
     final anio = fecha.year;
     final hora = fecha.hour.toString().padLeft(2, '0');
     final minuto = fecha.minute.toString().padLeft(2, '0');
-    
+
     return '$dia de $mes, $anio - $hora:$minuto';
   }
 
+  /// Obtiene el nombre del mes en español
   String _obtenerNombreMes(int mes) {
     const meses = [
-      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+      'Enero',
+      'Febrero',
+      'Marzo',
+      'Abril',
+      'Mayo',
+      'Junio',
+      'Julio',
+      'Agosto',
+      'Septiembre',
+      'Octubre',
+      'Noviembre',
+      'Diciembre'
     ];
     return meses[mes - 1];
   }
@@ -183,264 +264,456 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFD7EAD9), // Fondo verde claro
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const Text(
-          'Detalle del partido',
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: _buildAppBar(),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _partido == null
-              ? const Center(child: Text('Partido no encontrado'))
-              : SingleChildScrollView(
-                  child: Container(
-                    margin: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE5EFE6), // Fondo más claro para el contenido
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Encabezado con fecha y tipo de partido
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFD2C9A0), // Color beige para el encabezado
-                            borderRadius: BorderRadius.only(
-                              topLeft: Radius.circular(20),
-                              topRight: Radius.circular(20),
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  const Icon(
-                                    Icons.calendar_today,
-                                    color: Colors.green,
-                                    size: 24,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    _formatearFecha(_partido!.fecha),
-                                    style: const TextStyle(
-                                      color: Colors.green,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                '${_partido!.tipo} ${_partido!.lugar}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 24,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        
-                        // Información del partido
-                        Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Estado del partido
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: _partido!.completo
-                                      ? Colors.red.shade100
-                                      : Colors.green.shade100,
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  _partido!.completo
-                                      ? 'Partido completo'
-                                      : 'Faltan ${_partido!.jugadoresFaltantes} jugadores',
-                                  style: TextStyle(
-                                    color: _partido!.completo
-                                        ? Colors.red.shade800
-                                        : Colors.green.shade800,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              
-                              const SizedBox(height: 24),
-                              
-                              // Detalles del partido
-                              _buildInfoSection(
-                                'Ubicación',
-                                _partido!.lugar,
-                                Icons.location_on,
-                              ),
-                              
-                              const SizedBox(height: 16),
-                              
-                              _buildInfoSection(
-                                'Precio',
-                                '${_partido!.precio}€ por persona',
-                                Icons.euro,
-                              ),
-                              
-                              const SizedBox(height: 16),
-                              
-                              _buildInfoSection(
-                                'Duración',
-                                '${_partido!.duracion} minutos',
-                                Icons.timer,
-                              ),
-                              
-                              const SizedBox(height: 24),
-                              
-                              // Lista de jugadores
-                              const Text(
-                                'Jugadores inscritos',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              
-                              const SizedBox(height: 16),
-                              
-                              // Lista de jugadores (simulada)
-                              ListView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                itemCount: _partido!.jugadores.length,
-                                itemBuilder: (context, index) {
-                                  final jugador = _partido!.jugadores[index];
-                                  return ListTile(
-                                    leading: CircleAvatar(
-                                      backgroundImage: AssetImage(jugador.profileImageUrl ?? 'assets/profile.jpg'),
-                                    ),
-                                    title: Text(
-                                      '${jugador.nombre} ${jugador.apellidos}',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    subtitle: Text(
-                                      jugador.posicion ?? 'Sin posición',
-                                    ),
-                                  );
-                                },
-                              ),
-                              
-                              const SizedBox(height: 24),
-                              
-                              // Descripción del partido
-                              const Text(
-                                'Descripción',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              
-                              const SizedBox(height: 8),
-                              
-                              Text(
-                                _partido!.descripcion ?? 'Sin descripción',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                ),
-                              ),
-                              
-                              const SizedBox(height: 32),
-                              
-                              // Botón para inscribirse o abandonar
-                              SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton(
-                                  onPressed: _partido!.completo && !_usuarioInscrito
-                                      ? null // Desactivar si está completo y el usuario no está inscrito
-                                      : _usuarioInscrito
-                                          ? _abandonarPartido
-                                          : _inscribirsePartido,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: _usuarioInscrito
-                                        ? Colors.red
-                                        : const Color(0xFF5A9A7A),
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 16),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(30),
-                                    ),
-                                    disabledBackgroundColor: Colors.grey,
-                                  ),
-                                  child: Text(
-                                    _usuarioInscrito
-                                        ? 'Abandonar partido'
-                                        : 'Inscribirse al partido',
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              
-                              const SizedBox(height: 16),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+              ? _buildErrorState()
+              : _buildPartidoContent(),
     );
   }
 
+  /// Construye el AppBar personalizado
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+      elevation: 0,
+      leading: IconButton(
+        icon: Icon(Icons.arrow_back, color: Theme.of(context).iconTheme.color),
+        onPressed: () => Navigator.of(context).pop(),
+      ),
+      title: Text(
+        'Detalle del partido',
+        style: TextStyle(
+          color: Theme.of(context).textTheme.headlineMedium?.color,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  /// Construye el estado de error cuando no se encuentra el partido
+  Widget _buildErrorState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.sports_soccer,
+            size: 64,
+            color: Colors.grey[400],
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Partido no encontrado',
+            style: TextStyle(fontSize: 18),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: _cargarPartido,
+            child: const Text('Reintentar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Construye el contenido principal del partido
+  Widget _buildPartidoContent() {
+    return SingleChildScrollView(
+      child: Container(
+        margin: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.fieldBackground(context),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(25), // Sombra sutil
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(), // Encabezado con fecha y tipo
+            _buildPartidoInfo(), // Información del partido
+            _buildPlayersSection(), // Lista de jugadores
+            _buildActionButton(), // Botón de acción
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Construye el encabezado con fecha y tipo de partido
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.adaptiveBeige(context),
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.calendar_today,
+                color: Theme.of(context).colorScheme.primary,
+                size: 24,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _formatearFecha(_partido!.fecha),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '${_partido!.tipo} ${_partido!.lugar}',
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 24,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Construye la información detallada del partido
+  Widget _buildPartidoInfo() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Estado del partido
+          _buildEstadoPartido(),
+          const SizedBox(height: 24),
+
+          // Detalles del partido
+          _buildInfoSection('Ubicación', _partido!.lugar, Icons.location_on),
+          const SizedBox(height: 16),
+          _buildInfoSection(
+              'Precio', '${_partido!.precio}€ por persona', Icons.euro),
+          const SizedBox(height: 16),
+          _buildInfoSection(
+              'Duración', '${_partido!.duracion} minutos', Icons.timer),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  /// Construye el indicador de estado del partido
+  Widget _buildEstadoPartido() {
+    final isCompleto = _partido!.completo;
+    final jugadoresFaltantes = _partido!.jugadoresFaltantes;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: isCompleto ? Colors.red.shade100 : Colors.green.shade100,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isCompleto ? Colors.red.shade300 : Colors.green.shade300,
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isCompleto ? Icons.group : Icons.group_add,
+            color: isCompleto ? Colors.red.shade800 : Colors.green.shade800,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            isCompleto
+                ? 'Partido completo'
+                : 'Faltan $jugadoresFaltantes jugadores',
+            style: TextStyle(
+              color: isCompleto ? Colors.red.shade800 : Colors.green.shade800,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Construye la sección de jugadores inscritos
+  Widget _buildPlayersSection() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Jugadores inscritos',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildPlayersList(),
+        ],
+      ),
+    );
+  }
+
+  /// Construye la lista de jugadores con StreamBuilder
+  Widget _buildPlayersList() {
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('partidos')
+          .doc(widget.partidoId)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (!snapshot.hasData || snapshot.data!.data() == null) {
+          return const Text('No se pudo cargar la información de jugadores.');
+        }
+
+        final data = snapshot.data!.data() as Map<String, dynamic>;
+        final jugadores =
+            List<Map<String, dynamic>>.from(data['jugadores'] ?? []);
+
+        if (jugadores.isEmpty) {
+          return Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.grey[600]),
+                const SizedBox(width: 8),
+                Text(
+                  'No hay jugadores inscritos.',
+                  style: TextStyle(color: Colors.grey[600]),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: jugadores.length,
+          itemBuilder: (context, index) {
+            final jugador = jugadores[index];
+            return _buildPlayerTile(jugador);
+          },
+        );
+      },
+    );
+  }
+
+  /// Construye un tile individual de jugador
+  Widget _buildPlayerTile(Map<String, dynamic> jugador) {
+    final jugadorId = jugador['id'] as String?;
+
+    if (jugadorId == null) {
+      return ListTile(
+        leading: CircleAvatar(
+          backgroundColor: Colors.grey[300],
+          child: const Icon(Icons.person, color: Colors.grey),
+        ),
+        title: const Text('Jugador no válido'),
+        subtitle: const Text('ID no encontrado'),
+      );
+    }
+
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(jugadorId)
+          .snapshots(),
+      builder: (context, userSnapshot) {
+        if (userSnapshot.connectionState == ConnectionState.waiting) {
+          return ListTile(
+            leading: CircleAvatar(
+              backgroundColor: Colors.grey[300],
+              child: const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+            title: const Text('Cargando jugador...'),
+          );
+        }
+
+        if (userSnapshot.hasError ||
+            !userSnapshot.hasData ||
+            userSnapshot.data!.data() == null) {
+          return ListTile(
+            leading: CircleAvatar(
+              backgroundColor: Colors.grey[300],
+              child: const Icon(Icons.error, color: Colors.grey),
+            ),
+            title: const Text('Error al cargar jugador'),
+          );
+        }
+
+        final userData = userSnapshot.data!.data() as Map<String, dynamic>;
+        final imageUrl = userData['profileImageUrl'] as String?;
+        final nombre = userData['nombre'] ?? '';
+        final apellidos = userData['apellidos'] ?? '';
+        final posicion = userData['posicion'] ?? 'Sin posición';
+
+        return ListTile(
+          leading: CircleAvatar(
+            radius: 20,
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            backgroundImage: (imageUrl != null && imageUrl.isNotEmpty)
+                ? NetworkImage(imageUrl)
+                : null,
+            child: (imageUrl == null || imageUrl.isEmpty)
+                ? const Icon(Icons.person, color: Colors.white)
+                : null,
+          ),
+          title: Text(
+            '$nombre $apellidos',
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+          subtitle: Text(
+            posicion,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          // Indicar si es el usuario actual
+          trailing: jugadorId == widget.userId
+              ? Icon(
+                  Icons.person,
+                  color: Theme.of(context).colorScheme.primary,
+                  size: 20,
+                )
+              : null,
+        );
+      },
+    );
+  }
+
+  /// Construye el botón de acción principal
+  Widget _buildActionButton() {
+    final isCompleto = _partido!.completo;
+    final puedeInscribirse = !isCompleto || _usuarioInscrito;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: _procesandoSolicitud || (!puedeInscribirse)
+              ? null
+              : _usuarioInscrito
+                  ? _abandonarPartido
+                  : _inscribirsePartido,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: _usuarioInscrito
+                ? Colors.red
+                : Theme.of(context).colorScheme.primary,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(30),
+            ),
+            disabledBackgroundColor: Colors.grey,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (_procesandoSolicitud) ...[
+                const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                ),
+                const SizedBox(width: 12),
+              ],
+              if (_usuarioInscrito && !_procesandoSolicitud) ...[
+                const Icon(Icons.exit_to_app, size: 20),
+                const SizedBox(width: 8),
+              ],
+              Text(
+                _procesandoSolicitud
+                    ? 'Procesando...'
+                    : _usuarioInscrito
+                        ? 'Abandonar partido'
+                        : isCompleto
+                            ? 'Partido completo'
+                            : 'Inscribirse al partido',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Construye una sección de información con icono
   Widget _buildInfoSection(String title, String value, IconData icon) {
     return Row(
       children: [
         Icon(
           icon,
-          color: const Color(0xFF5A9A7A),
+          color: Theme.of(context).colorScheme.primary,
           size: 24,
         ),
         const SizedBox(width: 16),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Theme.of(context).textTheme.bodyMedium?.color,
+                ),
               ),
-            ),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );

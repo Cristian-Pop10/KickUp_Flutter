@@ -8,7 +8,9 @@ class UserModel {
   final int? nivel;
   final String? posicion;
   final String? telefono;
+  final int? puntos;
   final String? profileImageUrl;
+  final bool esAdmin; 
   // Podemos agregar createdAt si lo necesitas, pero como DateTime?
   final DateTime? createdAt;
 
@@ -22,7 +24,9 @@ class UserModel {
     this.nivel,
     this.posicion,
     this.telefono,
+    this.puntos,
     this.profileImageUrl,
+    this.esAdmin = false, 
     this.createdAt, // Opcional
   });
 
@@ -37,7 +41,9 @@ class UserModel {
     int? nivel,
     String? posicion,
     String? telefono,
+    int? puntos,
     String? profileImageUrl,
+    bool? esAdmin,
     DateTime? createdAt,
   }) {
     return UserModel(
@@ -50,7 +56,9 @@ class UserModel {
       nivel: nivel ?? this.nivel,
       posicion: posicion ?? this.posicion,
       telefono: telefono ?? this.telefono,
+      puntos: puntos ?? this.puntos,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
+      esAdmin: esAdmin ?? this.esAdmin,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -67,7 +75,9 @@ class UserModel {
       nivel: json['nivel'] != null ? int.parse(json['nivel'].toString()) : null,
       posicion: json['posicion'],
       telefono: json['telefono'],
-      profileImageUrl: json['profileImageUrl'],
+      puntos: json['puntos'] != null ? int.parse(json['puntos'].toString()) : null,
+      profileImageUrl: json['profileImageUrl'] as String?,
+      esAdmin: json['esAdmin'] ?? false, // Por defecto es false
       createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : null,
     );
   }
@@ -84,7 +94,9 @@ class UserModel {
       'nivel': nivel,
       'posicion': posicion,
       'telefono': telefono,
+      'puntos': puntos,
       'profileImageUrl': profileImageUrl,
+      'esAdmin': esAdmin,
       'createdAt': createdAt?.toIso8601String(),
     };
   }
