@@ -736,9 +736,13 @@ Future<void> _unirseAlEquipo() async {
           .snapshots(),
       builder: (context, userSnapshot) {
         String? imageUrl;
+        int puntos = jugador['puntos'] ?? 15; // Valor por defecto del array
+        
         if (userSnapshot.hasData && userSnapshot.data!.data() != null) {
           final userData = userSnapshot.data!.data() as Map<String, dynamic>;
           imageUrl = userData['profileImageUrl'] as String?;
+          // Usar los puntos actualizados de la colección usuarios
+          puntos = userData['puntos'] ?? 15;
         }
 
         return ListTile(
@@ -763,7 +767,7 @@ Future<void> _unirseAlEquipo() async {
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           trailing: Text(
-            '${jugador['puntos'] ?? '15'} pts',
+            '$puntos pts',
             style: TextStyle(
               color: Theme.of(context).colorScheme.primary,
               fontWeight: FontWeight.bold,

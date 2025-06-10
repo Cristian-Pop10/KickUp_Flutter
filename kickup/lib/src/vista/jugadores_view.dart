@@ -91,7 +91,8 @@ class _JugadoresViewState extends State<JugadoresView> {
     final query = _searchController.text.toLowerCase();
     setState(() {
       _jugadoresFiltrados = _jugadores.where((jugador) {
-        final nombre = '${jugador['nombre']} ${jugador['apellidos']}'.toLowerCase();
+        final nombre =
+            '${jugador['nombre']} ${jugador['apellidos']}'.toLowerCase();
         final email = jugador['email'].toString().toLowerCase();
         return nombre.contains(query) || email.contains(query);
       }).toList();
@@ -146,12 +147,14 @@ class _JugadoresViewState extends State<JugadoresView> {
   Future<void> _aplicarSancion(String jugadorId, String tipoSancion) async {
     try {
       final puntosARestar = tipoSancion == 'ausencia' ? 3 : 1;
-      final jugadorRef = FirebaseFirestore.instance.collection('usuarios').doc(jugadorId);
-      
+      final jugadorRef =
+          FirebaseFirestore.instance.collection('usuarios').doc(jugadorId);
+
       // Obtener puntos actuales
       final doc = await jugadorRef.get();
       final puntosActuales = doc.data()?['puntos'] ?? 15;
-      final nuevosPuntos = (puntosActuales - puntosARestar).clamp(0, double.infinity);
+      final nuevosPuntos =
+          (puntosActuales - puntosARestar).clamp(0, double.infinity);
 
       // Actualizar puntos
       await jugadorRef.update({
@@ -163,6 +166,28 @@ class _JugadoresViewState extends State<JugadoresView> {
           'appliedBy': userId,
         }
       });
+
+      // Actualizar los puntos en el array 'jugadores' de cada equipo donde esté el jugador
+      final equiposSnapshot = await FirebaseFirestore.instance
+          .collection('equipos')
+          .where('jugadoresIds', arrayContains: jugadorId)
+          .get();
+
+      for (final equipoDoc in equiposSnapshot.docs) {
+        final data = equipoDoc.data();
+        final jugadores = List<Map<String, dynamic>>.from(data['jugadores'] ?? []);
+        final jugadoresActualizados = jugadores.map((j) {
+          if (j['id'] == jugadorId) {
+            return {
+              ...j,
+              'puntos': nuevosPuntos,
+            };
+          }
+          return j;
+        }).toList();
+
+        await equipoDoc.reference.update({'jugadores': jugadoresActualizados});
+      }
 
       // Mostrar confirmación
       if (mounted) {
@@ -251,22 +276,30 @@ class _JugadoresViewState extends State<JugadoresView> {
         final puntosARestar = tipoSancion == 'ausencia' ? 3 : 1;
 
         for (final jugadorId in _jugadoresSeleccionados) {
-          final jugadorRef = FirebaseFirestore.instance.collection('usuarios').doc(jugadorId);
-          
-          // Encontrar puntos actuales
           final jugador = _jugadores.firstWhere((j) => j['id'] == jugadorId);
           final puntosActuales = jugador['puntos'] ?? 15;
           final nuevosPuntos = (puntosActuales - puntosARestar).clamp(0, double.infinity);
 
-          batch.update(jugadorRef, {
-            'puntos': nuevosPuntos,
-            'lastSanction': {
-              'type': tipoSancion,
-              'points': puntosARestar,
-              'date': FieldValue.serverTimestamp(),
-              'appliedBy': userId,
-            }
-          });
+          final equiposSnapshot = await FirebaseFirestore.instance
+              .collection('equipos')
+              .where('jugadoresIds', arrayContains: jugadorId)
+              .get();
+
+          for (final equipoDoc in equiposSnapshot.docs) {
+            final data = equipoDoc.data();
+            final jugadores = List<Map<String, dynamic>>.from(data['jugadores'] ?? []);
+            final jugadoresActualizados = jugadores.map((j) {
+              if (j['id'] == jugadorId) {
+                return {
+                  ...j,
+                  'puntos': nuevosPuntos,
+                };
+              }
+              return j;
+            }).toList();
+
+            await equipoDoc.reference.update({'jugadores': jugadoresActualizados});
+          }
         }
 
         await batch.commit();
@@ -309,8 +342,7 @@ class _JugadoresViewState extends State<JugadoresView> {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: !_modoSeleccion,
-      // ignore: deprecated_member_use
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, result) {
         if (!didPop && _modoSeleccion) {
           setState(() {
             _modoSeleccion = false;
@@ -372,7 +404,8 @@ class _JugadoresViewState extends State<JugadoresView> {
                 _modoSeleccion ? 'Modo Sanción Masiva' : 'Administrador',
                 style: TextStyle(
                   fontSize: 14,
-                  color: _modoSeleccion ? Colors.orange[700] : Colors.green[700],
+                  color:
+                      _modoSeleccion ? Colors.orange[700] : Colors.green[700],
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -416,7 +449,8 @@ class _JugadoresViewState extends State<JugadoresView> {
           decoration: InputDecoration(
             hintText: 'Buscar jugadores...',
             hintStyle: TextStyle(color: Theme.of(context).hintColor),
-            prefixIcon: Icon(Icons.search, color: Theme.of(context).iconTheme.color),
+            prefixIcon:
+                Icon(Icons.search, color: Theme.of(context).iconTheme.color),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(20),
               borderSide: BorderSide.none,
@@ -444,7 +478,8 @@ class _JugadoresViewState extends State<JugadoresView> {
               child: ElevatedButton(
                 onPressed: _toggleModoSeleccion,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _modoSeleccion ? Colors.orange[700] : Colors.orange,
+                  backgroundColor:
+                      _modoSeleccion ? Colors.orange[700] : Colors.orange,
                   foregroundColor: Colors.white,
                   shape: const CircleBorder(),
                 ),
@@ -462,12 +497,12 @@ class _JugadoresViewState extends State<JugadoresView> {
                 height: 50,
                 margin: const EdgeInsets.only(left: 8),
                 child: ElevatedButton(
-                  onPressed: _jugadoresSeleccionados.isNotEmpty 
-                      ? _aplicarSancionesMasivas 
+                  onPressed: _jugadoresSeleccionados.isNotEmpty
+                      ? _aplicarSancionesMasivas
                       : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _jugadoresSeleccionados.isNotEmpty 
-                        ? Colors.red[700] 
+                    backgroundColor: _jugadoresSeleccionados.isNotEmpty
+                        ? Colors.red[700]
                         : Colors.grey,
                     foregroundColor: Colors.white,
                     shape: const CircleBorder(),
@@ -516,7 +551,8 @@ class _JugadoresViewState extends State<JugadoresView> {
                     itemCount: _jugadoresFiltrados.length,
                     itemBuilder: (context, index) {
                       final jugador = _jugadoresFiltrados[index];
-                      final isSelected = _jugadoresSeleccionados.contains(jugador['id']);
+                      final isSelected =
+                          _jugadoresSeleccionados.contains(jugador['id']);
 
                       return _JugadorCard(
                         jugador: jugador,
@@ -558,7 +594,7 @@ class _JugadorCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final puntos = jugador['puntos'] ?? 15;
     final isAdmin = jugador['isAdmin'] ?? false;
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       child: Card(
@@ -582,17 +618,17 @@ class _JugadorCard extends StatelessWidget {
                 CircleAvatar(
                   radius: 30,
                   backgroundColor: Colors.grey[300],
-                  backgroundImage: (jugador['profileImageUrl'] != null && 
-                                   jugador['profileImageUrl'].isNotEmpty)
+                  backgroundImage: (jugador['profileImageUrl'] != null &&
+                          jugador['profileImageUrl'].isNotEmpty)
                       ? NetworkImage(jugador['profileImageUrl'])
                       : null,
-                  child: (jugador['profileImageUrl'] == null || 
+                  child: (jugador['profileImageUrl'] == null ||
                           jugador['profileImageUrl'].isEmpty)
                       ? const Icon(Icons.person, color: Colors.white, size: 30)
                       : null,
                 ),
                 const SizedBox(width: 16),
-                
+
                 // Información del jugador
                 Expanded(
                   child: Column(
@@ -611,7 +647,8 @@ class _JugadorCard extends StatelessWidget {
                           ),
                           if (isAdmin)
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
                                 color: Colors.orange,
                                 borderRadius: BorderRadius.circular(8),
@@ -647,13 +684,14 @@ class _JugadorCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                
+
                 // Puntos y checkbox
                 Column(
                   children: [
                     // Puntos con color según el valor
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
                         color: _getColorForPoints(puntos),
                         borderRadius: BorderRadius.circular(20),
@@ -673,7 +711,7 @@ class _JugadorCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                    
+
                     // Checkbox en modo selección
                     if (modoSeleccion) ...[
                       const SizedBox(height: 8),

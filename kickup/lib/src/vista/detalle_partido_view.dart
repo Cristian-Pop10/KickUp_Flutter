@@ -671,6 +671,7 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
         final nombre = userData['nombre'] ?? '';
         final apellidos = userData['apellidos'] ?? '';
         final posicion = userData['posicion'] ?? 'Sin posición';
+        final puntos = userData['puntos'] ?? 15; // Obtener puntos del usuario
 
         return ListTile(
           leading: CircleAvatar(
@@ -693,14 +694,29 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
             posicion,
             style: Theme.of(context).textTheme.bodyMedium,
           ),
-          // Indicar si es el usuario actual
-          trailing: jugadorId == widget.userId
-              ? Icon(
+          // Mostrar puntos y indicador de usuario actual
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Indicar si es el usuario actual (ahora primero)
+              if (jugadorId == widget.userId) ...[
+                Icon(
                   Icons.person,
                   color: Theme.of(context).colorScheme.primary,
                   size: 20,
-                )
-              : null,
+                ),
+                const SizedBox(width: 8),
+              ],
+              // Mostrar puntos (ahora después del icono)
+              Text(
+                '$puntos pts',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
         );
       },
     );

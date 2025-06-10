@@ -333,8 +333,7 @@ class _PistasViewState extends State<PistasView> {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: !_modoSeleccion,
-      // ignore: deprecated_member_use
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, result) {
         if (!didPop && _modoSeleccion) {
           setState(() {
             _modoSeleccion = false;
@@ -503,7 +502,7 @@ class _PistasViewState extends State<PistasView> {
 
   /** Construye botones de acción pequeños con estilo adaptativo */
   Widget _buildActionButton({
-    Key? key, 
+    Key? key,
     required IconData icon,
     required VoidCallback onPressed,
     required String tooltip,
@@ -511,7 +510,7 @@ class _PistasViewState extends State<PistasView> {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
-      key: key, 
+      key: key,
       decoration: BoxDecoration(
         color: isDarkMode ? Colors.white.withAlpha(25) : Colors.grey[200],
         borderRadius: BorderRadius.circular(8),
@@ -623,19 +622,20 @@ class _PistasViewState extends State<PistasView> {
   /** Construye la vista de lista con pull-to-refresh */
   Widget _buildLista() {
     return RefreshIndicator(
-      onRefresh: _cargarPistas,
-      child: ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: _pistasFiltradas.length,
-        itemBuilder: (context, index) {
-          final pista = _pistasFiltradas[index];
-          return _buildPistaCard(
-            pista,
-            key: index == 0 ? _detallePistaKey : null, // Solo el primero para tutorial
-          );
-        },
-      )
-    );
+        onRefresh: _cargarPistas,
+        child: ListView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: _pistasFiltradas.length,
+          itemBuilder: (context, index) {
+            final pista = _pistasFiltradas[index];
+            return _buildPistaCard(
+              pista,
+              key: index == 0
+                  ? _detallePistaKey
+                  : null, // Solo el primero para tutorial
+            );
+          },
+        ));
   }
 
   /** Construye el mapa de Google Maps con marcadores */
@@ -687,7 +687,7 @@ class _PistasViewState extends State<PistasView> {
     final isSelected = _pistasSeleccionadas.contains(pista.id);
 
     return Container(
-      key: key, 
+      key: key,
       margin: const EdgeInsets.only(bottom: 12),
       child: Card(
         color: Theme.of(context).scaffoldBackgroundColor,
