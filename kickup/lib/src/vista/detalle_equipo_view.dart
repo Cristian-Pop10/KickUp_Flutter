@@ -1,19 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:kickup/src/componentes/app_styles.dart';
+import 'package:kickup/src/vista/pista_view.dart';
 import '../controlador/equipo_controller.dart';
 import '../modelo/equipo_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 
+/** Vista detallada de un equipo deportivo.
+ * Muestra información completa del equipo, lista de jugadores,
+ * y permite unirse/abandonar el equipo. Incluye funcionalidad
+ * para cambiar el logo del equipo y un tutorial interactivo.
+ */
 class DetalleEquipoView extends StatefulWidget {
+  /** ID del equipo a mostrar */
   final String equipoId;
+  
+  /** ID del usuario actual */
   final String userId;
+  
+  /** Indica si se debe mostrar el tutorial */
+  final bool showTutorial;
 
   const DetalleEquipoView({
     Key? key,
     required this.equipoId,
     required this.userId,
+    this.showTutorial = false, 
   }) : super(key: key);
 
   @override
@@ -28,17 +42,74 @@ class _DetalleEquipoViewState extends State<DetalleEquipoView> {
   EquipoModel? _equipo;
   bool _isLoading = true;
   bool _esMiembro = false;
-  bool _esCreador = false;
   bool _procesandoSolicitud = false;
-  bool _isAdmin = false; // Variable para verificar si el usuario es admin
+  bool _isAdmin = false; 
+
+  // Referencias para el tutorial
+  final GlobalKey _unirseKey = GlobalKey();
+  List<TargetFocus> targets = [];
 
   @override
   void initState() {
     super.initState();
     _cargarEquipo();
+
+    // Iniciar tutorial si está habilitado
+    if (widget.showTutorial) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _showTutorial());
+    }
   }
 
-  /// Carga la información del equipo y determina el rol del usuario
+  /** Muestra el tutorial interactivo para guiar al usuario.
+   * Utiliza la biblioteca TutorialCoachMark para resaltar
+   * elementos importantes de la interfaz con explicaciones.
+   */
+  void _showTutorial() {
+    targets = [
+      TargetFocus(
+        identify: "unirse",
+        keyTarget: _unirseKey,
+        contents: [
+          TargetContent(
+            child: const Text(
+              "¡Únete al equipo aquí!",
+              style: TextStyle(color: Colors.white, fontSize: 20),
+            ),
+          ),
+        ],
+      ),
+    ];
+
+    TutorialCoachMark(
+      targets: targets,
+      colorShadow: Colors.black,
+      textSkip: "Saltar",
+      paddingFocus: 8,
+      opacityShadow: 0.8,
+      onFinish: () {
+        // Al terminar, navega a PistasView con tutorial
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => PistasView(showTutorial: true),
+          ),
+        );
+        return false;
+      },
+      onSkip: () {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => PistasView(showTutorial: true),
+          ),
+        );
+        return false;
+      },
+    ).show(context: context);
+  }
+
+  /** Carga la información del equipo y determina el rol del usuario.
+   * Obtiene datos del equipo desde Firestore y verifica si el usuario
+   * actual es miembro del equipo o administrador.
+   */
   Future<void> _cargarEquipo() async {
   setState(() {
     _isLoading = true;
@@ -63,14 +134,12 @@ class _DetalleEquipoViewState extends State<DetalleEquipoView> {
       // Determinar el rol del usuario en el equipo
       final jugadoresIds = List<String>.from(data['jugadoresIds'] ?? []);
       final esMiembro = jugadoresIds.contains(widget.userId);
-      final esCreador = data['creadorId'] == widget.userId;
       final isAdmin = await _equipoController.esUsuarioAdmin(widget.userId);
 
       if (mounted) {
         setState(() {
           _equipo = equipo;
           _esMiembro = esMiembro;
-          _esCreador = esCreador;
           _isAdmin = isAdmin;
           _isLoading = false;
         });
@@ -95,16 +164,10 @@ class _DetalleEquipoViewState extends State<DetalleEquipoView> {
   }
 }
 
-  /// Fuerza la actualización de los StreamBuilders
-void _forzarActualizacion() {
-  if (mounted) {
-    setState(() {
-      // Esto fuerza una reconstrucción de todos los widgets
-    });
-  }
-}
-
-  /// Abandona el equipo y actualiza el estado inmediatamente
+  /** Permite al usuario abandonar el equipo.
+   * Muestra un diálogo de confirmación y actualiza Firestore
+   * para eliminar al usuario de la lista de jugadores.
+   */
 Future<void> _abandonarEquipo() async {
   if (_procesandoSolicitud) return;
 
@@ -128,7 +191,6 @@ Future<void> _abandonarEquipo() async {
           .update({
         'jugadoresIds': FieldValue.arrayRemove([widget.userId]),
         'jugadores': FieldValue.arrayRemove([
-          // Necesitamos encontrar y remover el objeto completo del jugador
           // Esto se manejará en el controlador, pero forzamos la actualización aquí
         ]),
         'lastUpdated': FieldValue.serverTimestamp(),
@@ -174,7 +236,10 @@ Future<void> _abandonarEquipo() async {
   }
 }
 
-/// Se une al equipo y actualiza el estado inmediatamente
+/** Permite al usuario unirse al equipo.
+ * Actualiza Firestore para añadir al usuario a la lista de jugadores
+ * y muestra una notificación de éxito.
+ */
 Future<void> _unirseAlEquipo() async {
   if (_procesandoSolicitud) return;
 
@@ -253,7 +318,9 @@ Future<void> _unirseAlEquipo() async {
   }
 }
 
-  /// Muestra diálogo de confirmación para abandonar equipo
+  /** Muestra un diálogo de confirmación para abandonar el equipo.
+   * @return true si el usuario confirma, false en caso contrario
+   */
   Future<bool?> _mostrarDialogoConfirmacion() {
     return showDialog<bool>(
       context: context,
@@ -278,9 +345,12 @@ Future<void> _unirseAlEquipo() async {
     );
   }
 
-  /// Muestra opciones para cambiar el logo del equipo
+  /** Muestra opciones para cambiar el logo del equipo.
+   * Presenta un modal con opciones para seleccionar imagen
+   * desde la galería o tomar una foto con la cámara.
+   */
   Future<void> _mostrarOpcionesCambiarLogo() async {
-    // Cambio: Permitir a cualquier miembro del equipo cambiar el logo
+    // Permitir a cualquier miembro del equipo cambiar el logo
     if (!_esMiembro) return;
 
     final ImageSource? source = await showModalBottomSheet<ImageSource>(
@@ -332,7 +402,11 @@ Future<void> _unirseAlEquipo() async {
     }
   }
 
-  /// Cambia el logo del equipo usando la fuente especificada
+  /** Cambia el logo del equipo usando la fuente especificada.
+   * Procesa la imagen seleccionada, la sube a Firebase Storage
+   * y actualiza la referencia en Firestore.
+   * @param source Fuente de la imagen (galería o cámara)
+   */
   Future<void> _cambiarLogo(ImageSource source) async {
     final picker = ImagePicker();
 
@@ -430,7 +504,7 @@ Future<void> _unirseAlEquipo() async {
     );
   }
 
-  /// Construye el AppBar personalizado
+  /** Construye el AppBar personalizado */
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       backgroundColor: Colors.transparent,
@@ -449,7 +523,7 @@ Future<void> _unirseAlEquipo() async {
     );
   }
 
-  /// Construye el contenido principal de la pantalla
+  /** Construye el contenido principal de la pantalla */
   Widget _buildDetalleEquipo() {
     if (_equipo == null) {
       return const Center(child: Text('No se encontró información del equipo'));
@@ -474,7 +548,7 @@ Future<void> _unirseAlEquipo() async {
     );
   }
 
-  /// Construye el header con el nombre del equipo
+  /** Construye el header con el nombre del equipo */
   Widget _buildHeader() {
     return Center(
       child: Text(
@@ -488,7 +562,9 @@ Future<void> _unirseAlEquipo() async {
     );
   }
 
-  /// Construye la sección del logo con funcionalidad de cambio
+  /** Construye la sección del logo con funcionalidad de cambio.
+   * Muestra el logo del equipo y permite a los miembros cambiarlo.
+   */
   Widget _buildLogoSection() {
     return Center(
       child: StreamBuilder<DocumentSnapshot>(
@@ -504,14 +580,14 @@ Future<void> _unirseAlEquipo() async {
           }
 
           return GestureDetector(
-            // Cambio: Permitir a cualquier miembro del equipo cambiar el logo
+            // Permitir a cualquier miembro del equipo cambiar el logo
             onTap: _esMiembro ? _mostrarOpcionesCambiarLogo : null,
             child: Container(
               width: 150,
               height: 150,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(15),
-                // Cambio: Mostrar borde especial para cualquier miembro
+                // Mostrar borde especial para cualquier miembro
                 border: _esMiembro
                     ? Border.all(
                         color: Theme.of(context).colorScheme.primary,
@@ -520,7 +596,7 @@ Future<void> _unirseAlEquipo() async {
                     : Border.all(color: Colors.grey[300]!, width: 1),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withAlpha(25), // Sombra sutil
+                    color: Colors.black.withAlpha(25), 
                     blurRadius: 8,
                     offset: const Offset(0, 4),
                   ),
@@ -545,7 +621,7 @@ Future<void> _unirseAlEquipo() async {
                           : _buildDefaultLogo(),
                     ),
                   ),
-                  // Cambio: Mostrar indicador de edición para cualquier miembro
+                  // Mostrar indicador de edición para cualquier miembro
                   if (_esMiembro)
                     Positioned(
                       bottom: 8,
@@ -557,7 +633,7 @@ Future<void> _unirseAlEquipo() async {
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black
-                                  .withAlpha(76), // Sombra más visible
+                                  .withAlpha(76), 
                               blurRadius: 4,
                               offset: const Offset(0, 2),
                             ),
@@ -580,7 +656,7 @@ Future<void> _unirseAlEquipo() async {
     );
   }
 
-  /// Construye el logo por defecto
+  /** Construye el logo por defecto cuando no hay imagen */
   Widget _buildDefaultLogo() {
     return Container(
       color: Colors.grey[300],
@@ -592,7 +668,7 @@ Future<void> _unirseAlEquipo() async {
     );
   }
 
-  /// Construye la sección de jugadores
+  /** Construye la sección de jugadores con lista actualizada en tiempo real */
   Widget _buildPlayersSection() {
     return StreamBuilder<DocumentSnapshot>(
       stream: FirebaseFirestore.instance
@@ -649,7 +725,7 @@ Future<void> _unirseAlEquipo() async {
     );
   }
 
-  /// Construye un tile individual de jugador
+  /** Construye un tile individual de jugador con avatar y datos */
   Widget _buildPlayerTile(Map<String, dynamic> jugador) {
     final jugadorId = jugador['id'] as String?;
 
@@ -698,7 +774,7 @@ Future<void> _unirseAlEquipo() async {
     );
   }
 
-  /// Construye la sección de información del equipo
+  /** Construye la sección de información del equipo */
   Widget _buildInfoSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -721,7 +797,7 @@ Future<void> _unirseAlEquipo() async {
     );
   }
 
-  /// Construye una fila de información
+  /** Construye una fila de información con etiqueta y valor */
   Widget _buildInfoRow(String label, String value) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -744,13 +820,16 @@ Future<void> _unirseAlEquipo() async {
     );
   }
 
-  /// Construye el botón de acción (Unirse o Abandonar)
+  /** Construye el botón de acción (Unirse o Abandonar).
+   * Muestra un botón diferente según si el usuario es miembro o no.
+   */
   Widget _buildActionButton() {
-    if (_isAdmin) return const SizedBox.shrink(); // Oculta todo si es admin
+    if (_isAdmin) return const SizedBox.shrink(); // No mostrar botón para admins
 
     if (_esMiembro) {
       return Center(
         child: ElevatedButton.icon(
+          key: _unirseKey, // Key para el tutorial
           icon: const Icon(Icons.exit_to_app),
           label: const Text('Abandonar equipo'),
           onPressed: _abandonarEquipo,
@@ -766,6 +845,7 @@ Future<void> _unirseAlEquipo() async {
     } else {
       return Center(
         child: ElevatedButton.icon(
+          key: _unirseKey, // Key para el tutorial
           icon: const Icon(Icons.group_add),
           label: const Text('Unirse al equipo'),
           onPressed: _unirseAlEquipo,

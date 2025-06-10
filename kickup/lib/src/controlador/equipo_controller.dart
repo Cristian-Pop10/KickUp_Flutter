@@ -4,21 +4,22 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../modelo/equipo_model.dart';
 
+/** Controlador que gestiona todas las operaciones relacionadas con equipos.
+   Maneja la creación, búsqueda, modificación y eliminación de equipos,
+   así como la gestión de miembros y operaciones administrativas. */
 class EquipoController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
 
-  // Stream controller para notificar cambios en la lista de equipos
   static final _equiposStreamController =
       StreamController<List<EquipoModel>>.broadcast();
 
-  // Stream para escuchar cambios en la lista de equipos
+  /** Stream para escuchar cambios en tiempo real de la lista de equipos. */
   Stream<List<EquipoModel>> get equiposStream =>
       _equiposStreamController.stream;
 
-  // Constructor que inicia la escucha de cambios en Firebase
+  /** Constructor que inicia la escucha de cambios en Firebase. */
   EquipoController() {
-    // Suscribirse al stream de Firebase
     _firestore.collection('equipos').snapshots().listen((snapshot) {
       final equipos =
           snapshot.docs.map((doc) => EquipoModel.fromJson(doc.data())).toList();
@@ -26,10 +27,7 @@ class EquipoController {
     });
   }
 
-  // MÉTODOS EXISTENTES (mantener todos los que ya tienes)
-  
-
-  // Método para obtener todos los equipos
+  /** Obtiene todos los equipos de la base de datos. */
   Future<List<EquipoModel>> obtenerEquipos() async {
     try {
       final querySnapshot = await _firestore.collection('equipos').get();
@@ -44,33 +42,29 @@ class EquipoController {
     }
   }
 
-  // Método para crear un nuevo equipo con imagen
+  /** Crea un nuevo equipo con imagen de logo opcional.
+     Sube la imagen a Firebase Storage si se proporciona y guarda el equipo en Firestore. */
   Future<bool> crearEquipoConImagen(EquipoModel equipo, File? logoImage) async {
     try {
-      String logoUrl = equipo.logoUrl; // Usar la URL por defecto
+      String logoUrl = equipo.logoUrl;
 
-      // Si hay una imagen, subirla a Firebase Storage
       if (logoImage != null) {
         final timestamp = DateTime.now().millisecondsSinceEpoch;
         final path = 'equipos/${equipo.nombre}_$timestamp.jpg';
 
-        // Subir la imagen a Firebase Storage
         final ref = _storage.ref().child(path);
         final uploadTask = ref.putFile(logoImage);
         final snapshot = await uploadTask.whenComplete(() => null);
         logoUrl = await snapshot.ref.getDownloadURL();
       }
 
-      // Crear una copia del equipo con la URL de la imagen
       final equipoConLogo = equipo.copyWith(logoUrl: logoUrl);
 
-      // Si no tiene ID, generar uno
       final id = equipo.id.isEmpty
           ? 'equipo_${DateTime.now().millisecondsSinceEpoch}'
           : equipo.id;
       final equipoConId = equipoConLogo.copyWith(id: id);
 
-      // Guardar el equipo en Firestore
       await _firestore.collection('equipos').doc(id).set(equipoConId.toJson());
 
       return true;
@@ -80,7 +74,7 @@ class EquipoController {
     }
   }
 
-  // Método para crear un nuevo equipo
+  /** Crea un nuevo equipo y asigna al usuario creador como capitán. */
   Future<bool> crearEquipo(EquipoModel equipo, String userIdCreador) async {
     try {
       final equipoConCapitan = equipo.copyWith(
@@ -97,17 +91,15 @@ class EquipoController {
     }
   }
 
-  // Método para buscar equipos por texto
+  /** Busca equipos por nombre, tipo o descripción.
+     Realiza búsqueda insensible a mayúsculas y minúsculas. */
   Future<List<EquipoModel>> buscarEquipos(String query) async {
     try {
       if (query.isEmpty) {
         return await obtenerEquipos();
       }
 
-      // Convertir la consulta a minúsculas para búsqueda insensible a mayúsculas
       final queryLower = query.toLowerCase();
-
-      // Obtener todos los equipos y filtrar en memoria
       final equipos = await obtenerEquipos();
 
       return equipos.where((equipo) {
@@ -121,7 +113,7 @@ class EquipoController {
     }
   }
 
-  // Método para obtener un equipo por su ID
+  /** Obtiene un equipo específico por su ID. */
   Future<EquipoModel?> obtenerEquipoPorId(String equipoId) async {
     try {
       final doc = await _firestore.collection('equipos').doc(equipoId).get();
@@ -135,7 +127,8 @@ class EquipoController {
     }
   }
 
-  // Método para unirse a un equipo
+  /** Permite a un usuario unirse a un equipo.
+     Utiliza transacciones para garantizar consistencia de datos. */
   Future<bool> unirseEquipo(String equipoId, String userId) async {
     try {
       final equipoRef = _firestore.collection('equipos').doc(equipoId);
@@ -152,10 +145,8 @@ class EquipoController {
         final jugadores =
             List<Map<String, dynamic>>.from(data['jugadores'] ?? []);
 
-        // Verificar si ya es miembro
         if (jugadoresIds.contains(userId)) return true;
 
-        // Agregar el jugador
         jugadoresIds.add(userId);
         jugadores.add({
           'id': userId,
@@ -178,7 +169,8 @@ class EquipoController {
     }
   }
 
-  // Método para abandonar un equipo
+  /** Permite a un usuario abandonar un equipo.
+     Utiliza transacciones para garantizar consistencia de datos. */
   Future<bool> abandonarEquipo(String equipoId, String userId) async {
     try {
       final equipoRef = _firestore.collection('equipos').doc(equipoId);
@@ -210,7 +202,7 @@ class EquipoController {
     }
   }
 
-  // Método para actualizar el logo de un equipo
+  /** Actualiza la URL del logo de un equipo. */
   Future<void> actualizarLogoEquipo(String equipoId, String logoUrl) async {
     await FirebaseFirestore.instance
         .collection('equipos')
@@ -220,9 +212,7 @@ class EquipoController {
     });
   }
 
-  // ========== MÉTODOS DE ADMINISTRADOR ==========
-
-  // Método para verificar si el usuario es admin
+  /** Verifica si un usuario tiene permisos de administrador. */
   Future<bool> esUsuarioAdmin(String userId) async {
     try {
       final userDoc = await _firestore.collection('usuarios').doc(userId).get();
@@ -237,17 +227,15 @@ class EquipoController {
     }
   }
 
-  // Método para eliminar un equipo (solo admin)
+  /** Elimina un equipo específico. Solo disponible para administradores. */
   Future<bool> eliminarEquipo(String equipoId, String userId) async {
     try {
-      // Verificar permisos de admin
       final esAdmin = await esUsuarioAdmin(userId);
       if (!esAdmin) {
         print('Usuario no tiene permisos de administrador');
         return false;
       }
 
-      // Eliminar el equipo
       await _firestore.collection('equipos').doc(equipoId).delete();
       return true;
     } catch (e) {
@@ -256,10 +244,11 @@ class EquipoController {
     }
   }
 
-  // Método para eliminar múltiples equipos (solo admin)
-  Future<int> eliminarEquiposMultiples(List<String> equiposIds, String userId) async {
+  /** Elimina múltiples equipos en una sola operación.
+     Solo disponible para administradores. Utiliza batch para optimizar la operación. */
+  Future<int> eliminarEquiposMultiples(
+      List<String> equiposIds, String userId) async {
     try {
-      // Verificar permisos de admin
       final esAdmin = await esUsuarioAdmin(userId);
       if (!esAdmin) {
         print('Usuario no tiene permisos de administrador');
@@ -283,52 +272,7 @@ class EquipoController {
     }
   }
 
-  // Método para obtener estadísticas (solo admin)
-  Future<Map<String, int>> obtenerEstadisticasEquipos(String userId) async {
-    try {
-      // Verificar permisos de admin
-      final esAdmin = await esUsuarioAdmin(userId);
-      if (!esAdmin) {
-        return {'total': 0, 'error': 1};
-      }
-
-      final equipos = await obtenerEquipos();
-      final total = equipos.length;
-      
-      // Contar equipos por tipo
-      final Map<String, int> estadisticas = {
-        'total': total,
-        'futbolSala': 0,
-        'futbol7': 0,
-        'futbol11': 0,
-        'futbolPlaya': 0,
-      };
-
-      for (final equipo in equipos) {
-        switch (equipo.tipo.toLowerCase()) {
-          case 'fútbol sala':
-            estadisticas['futbolSala'] = (estadisticas['futbolSala'] ?? 0) + 1;
-            break;
-          case 'fútbol 7':
-            estadisticas['futbol7'] = (estadisticas['futbol7'] ?? 0) + 1;
-            break;
-          case 'fútbol 11':
-            estadisticas['futbol11'] = (estadisticas['futbol11'] ?? 0) + 1;
-            break;
-          case 'fútbol playa':
-            estadisticas['futbolPlaya'] = (estadisticas['futbolPlaya'] ?? 0) + 1;
-            break;
-        }
-      }
-
-      return estadisticas;
-    } catch (e) {
-      print('Error al obtener estadísticas: $e');
-      return {'total': 0, 'error': 1};
-    }
-  }
-
-  // Método para cerrar el stream controller
+  /** Cierra el stream controller para liberar recursos. */
   void dispose() {
     _equiposStreamController.close();
   }

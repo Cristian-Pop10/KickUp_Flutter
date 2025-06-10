@@ -3,26 +3,30 @@ import '../modelo/partido_model.dart';
 import '../modelo/user_model.dart';
 import 'dart:async';
 
+/** Controlador que gestiona todas las operaciones relacionadas con partidos.
+   Maneja la creación, búsqueda, inscripción y abandono de partidos,
+   así como la verificación de estado de inscripciones. */
 class PartidoController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Stream para escuchar cambios en la colección de partidos
+  /** Stream para escuchar cambios en tiempo real de la colección de partidos.
+     Los partidos se ordenan por fecha de forma ascendente. */
   Stream<List<PartidoModel>> get partidosStream => _firestore
       .collection('partidos')
-      .orderBy('fecha', descending: false) // Ordenar por fecha
+      .orderBy('fecha', descending: false)
       .snapshots()
       .map((snapshot) => snapshot.docs
           .map((doc) => PartidoModel.fromJson(doc.data()))
           .toList());
 
-  // Obtener todos los partidos
+  /** Obtiene todos los partidos ordenados por fecha. */
   Future<List<PartidoModel>> obtenerPartidos() async {
     try {
       final snapshot = await _firestore
           .collection('partidos')
-          .orderBy('fecha', descending: false) // Ordenar por fecha
+          .orderBy('fecha', descending: false)
           .get();
-      
+
       return snapshot.docs
           .map((doc) => PartidoModel.fromJson(doc.data()))
           .toList();
@@ -32,13 +36,15 @@ class PartidoController {
     }
   }
 
-  // Crear un nuevo partido
+  /** Crea un nuevo partido en la base de datos.
+     Genera automáticamente un ID único si no se proporciona. */
   Future<bool> crearPartido(PartidoModel partido) async {
     try {
-      // Si no tiene ID, generar uno
-      final id = partido.id.isEmpty ? 'partido_${DateTime.now().millisecondsSinceEpoch}' : partido.id;
+      final id = partido.id.isEmpty
+          ? 'partido_${DateTime.now().millisecondsSinceEpoch}'
+          : partido.id;
       final partidoConId = partido.copyWith(id: id);
-      
+
       await _firestore
           .collection('partidos')
           .doc(id)
@@ -50,27 +56,26 @@ class PartidoController {
     }
   }
 
-  // Buscar partidos por texto
+  /** Busca partidos por tipo, lugar o descripción.
+     Realiza búsqueda insensible a mayúsculas y minúsculas. */
   Future<List<PartidoModel>> buscarPartidos(String query) async {
     try {
       if (query.isEmpty) {
         return await obtenerPartidos();
       }
-      
-      // Convertir la consulta a minúsculas para búsqueda insensible a mayúsculas
+
       final queryLower = query.toLowerCase();
-      
-      // Obtener todos los partidos y filtrar en memoria
-      // Nota: Firestore no soporta búsquedas de texto completo nativas
+
       final snapshot = await _firestore.collection('partidos').get();
       final partidos = snapshot.docs
           .map((doc) => PartidoModel.fromJson(doc.data()))
           .where((partido) =>
               partido.tipo.toLowerCase().contains(queryLower) ||
               partido.lugar.toLowerCase().contains(queryLower) ||
-              (partido.descripcion?.toLowerCase().contains(queryLower) ?? false))
+              (partido.descripcion?.toLowerCase().contains(queryLower) ??
+                  false))
           .toList();
-      
+
       return partidos;
     } catch (e) {
       print('Error al buscar partidos: $e');
@@ -78,7 +83,7 @@ class PartidoController {
     }
   }
 
-  // Obtener un partido por su ID
+  /** Obtiene un partido específico por su ID. */
   Future<PartidoModel?> obtenerPartidoPorId(String partidoId) async {
     try {
       final doc = await _firestore.collection('partidos').doc(partidoId).get();
@@ -92,36 +97,34 @@ class PartidoController {
     }
   }
 
-  // Inscribirse a un partido (agregar userId a la lista de jugadores)
+  /** Inscribe a un usuario en un partido específico.
+     Utiliza transacciones para garantizar consistencia en el conteo de jugadores.
+     Actualiza automáticamente el estado de 'completo' del partido. */
   Future<bool> inscribirsePartido(String partidoId, UserModel user) async {
     try {
       final partidoRef = _firestore.collection('partidos').doc(partidoId);
-      
-      // Usar transacción para garantizar consistencia
+
       return await _firestore.runTransaction<bool>((transaction) async {
         final doc = await transaction.get(partidoRef);
         if (!doc.exists) return false;
 
         final data = doc.data()!;
-        final jugadores = List<Map<String, dynamic>>.from(data['jugadores'] ?? []);
-        
-        // Verificar si ya está inscrito
+        final jugadores =
+            List<Map<String, dynamic>>.from(data['jugadores'] ?? []);
+
         if (jugadores.any((j) => j['id'] == user.id)) return true;
 
-        // Agregar el jugador
         jugadores.add(user.toJson());
-        
-        // Actualizar jugadoresFaltantes y completo
+
         final jugadoresFaltantes = (data['jugadoresFaltantes'] as int) - 1;
         final completo = jugadoresFaltantes <= 0;
-        
-        // Actualizar el documento
+
         transaction.update(partidoRef, {
           'jugadores': jugadores,
           'jugadoresFaltantes': jugadoresFaltantes,
           'completo': completo,
         });
-        
+
         return true;
       });
     } catch (e) {
@@ -130,14 +133,15 @@ class PartidoController {
     }
   }
 
-  // Verificar si un usuario está inscrito en un partido
+  /** Verifica si un usuario específico está inscrito en un partido. */
   Future<bool> verificarInscripcion(String partidoId, String userId) async {
     try {
       final doc = await _firestore.collection('partidos').doc(partidoId).get();
       if (!doc.exists) return false;
 
       final data = doc.data()!;
-      final jugadores = List<Map<String, dynamic>>.from(data['jugadores'] ?? []);
+      final jugadores =
+          List<Map<String, dynamic>>.from(data['jugadores'] ?? []);
       return jugadores.any((j) => j['id'] == userId);
     } catch (e) {
       print('Error al verificar inscripción: $e');
@@ -145,35 +149,34 @@ class PartidoController {
     }
   }
 
-  // Abandonar un partido (eliminar userId de la lista de jugadores)
+  /** Permite a un usuario abandonar un partido.
+     Utiliza transacciones para garantizar consistencia en el conteo de jugadores.
+     Actualiza automáticamente el estado de 'completo' del partido. */
   Future<bool> abandonarPartido(String partidoId, String userId) async {
     try {
       final partidoRef = _firestore.collection('partidos').doc(partidoId);
-      
-      // Usar transacción para garantizar consistencia
+
       return await _firestore.runTransaction<bool>((transaction) async {
         final doc = await transaction.get(partidoRef);
         if (!doc.exists) return false;
 
         final data = doc.data()!;
-        final jugadores = List<Map<String, dynamic>>.from(data['jugadores'] ?? []);
-        
-        // Verificar si está inscrito
+        final jugadores =
+            List<Map<String, dynamic>>.from(data['jugadores'] ?? []);
+
         if (!jugadores.any((j) => j['id'] == userId)) return true;
-        
-        // Eliminar el jugador
-        final nuevosJugadores = jugadores.where((j) => j['id'] != userId).toList();
-        
-        // Actualizar jugadoresFaltantes y completo
+
+        final nuevosJugadores =
+            jugadores.where((j) => j['id'] != userId).toList();
+
         final jugadoresFaltantes = (data['jugadoresFaltantes'] as int) + 1;
-        
-        // Actualizar el documento
+
         transaction.update(partidoRef, {
           'jugadores': nuevosJugadores,
           'jugadoresFaltantes': jugadoresFaltantes,
-          'completo': false, // Si alguien abandona, ya no está completo
+          'completo': false,
         });
-        
+
         return true;
       });
     } catch (e) {

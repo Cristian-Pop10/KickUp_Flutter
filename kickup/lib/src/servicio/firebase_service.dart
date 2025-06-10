@@ -7,19 +7,41 @@ import '../modelo/partido_model.dart';
 import '../modelo/equipo_model.dart';
 import '../modelo/pista_model.dart';
 
+/** Servicio centralizado para interactuar con Firebase.
+   Proporciona métodos para autenticación, gestión de usuarios,
+   partidos, equipos, pistas y almacenamiento de archivos.
+   Encapsula toda la lógica de comunicación con Firebase. */
 class FirebaseService {
-  // Instancias de Firebase
+  /** Instancia de Firebase Authentication para gestión de usuarios */
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  
+  /** Instancia de Firestore para almacenamiento de datos */
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  
+  /** Instancia de Firebase Storage para almacenamiento de archivos */
   final FirebaseStorage _storage = FirebaseStorage.instance;
 
-  // Referencias a colecciones
+  /** Referencia a la colección de usuarios en Firestore */
   CollectionReference get _usersCollection => _firestore.collection('usuarios');
+  
+  /** Referencia a la colección de partidos en Firestore */
   CollectionReference get _partidosCollection => _firestore.collection('partidos');
+  
+  /** Referencia a la colección de equipos en Firestore */
   CollectionReference get _equiposCollection => _firestore.collection('equipos');
+  
+  /** Referencia a la colección de pistas en Firestore */
   CollectionReference get _pistasCollection => _firestore.collection('pistas');
 
-  // Métodos de autenticación
+  // MÉTODOS DE AUTENTICACIÓN
+
+  /** Registra un nuevo usuario con email y contraseña.
+     
+     [email] Dirección de correo electrónico del usuario.
+     [password] Contraseña del usuario.
+     
+     Retorna un UserCredential si el registro es exitoso.
+     Lanza una excepción en caso de error. */
   Future<UserCredential> registrarUsuario(String email, String password) async {
     try {
       return await _auth.createUserWithEmailAndPassword(
@@ -32,6 +54,13 @@ class FirebaseService {
     }
   }
 
+  /** Inicia sesión con email y contraseña.
+     
+     [email] Dirección de correo electrónico del usuario.
+     [password] Contraseña del usuario.
+     
+     Retorna un UserCredential si el inicio de sesión es exitoso.
+     Lanza una excepción en caso de error. */
   Future<UserCredential> iniciarSesion(String email, String password) async {
     try {
       return await _auth.signInWithEmailAndPassword(
@@ -44,6 +73,9 @@ class FirebaseService {
     }
   }
 
+  /** Cierra la sesión del usuario actual.
+     
+     Lanza una excepción en caso de error. */
   Future<void> cerrarSesion() async {
     try {
       return await _auth.signOut();
@@ -53,7 +85,13 @@ class FirebaseService {
     }
   }
 
-  // Métodos para usuarios
+  /******************  MÉTODOS PARA USUARIOS *********************/
+
+  /** Crea un nuevo usuario en Firestore.
+     
+     [usuario] Modelo del usuario a crear.
+     
+     Lanza una excepción en caso de error. */
   Future<void> crearUsuario(UserModel usuario) async {
     try {
       return await _usersCollection.doc(usuario.id).set(usuario.toJson());
@@ -63,6 +101,12 @@ class FirebaseService {
     }
   }
 
+  /** Obtiene un usuario por su ID.
+     
+     [userId] ID del usuario a obtener.
+     
+     Retorna un UserModel si el usuario existe, null en caso contrario.
+     Lanza una excepción en caso de error. */
   Future<UserModel?> obtenerUsuario(String userId) async {
     try {
       final doc = await _usersCollection.doc(userId).get();
@@ -76,6 +120,11 @@ class FirebaseService {
     }
   }
 
+  /** Actualiza los datos de un usuario existente.
+     
+     [usuario] Modelo del usuario con los datos actualizados.
+     
+     Lanza una excepción en caso de error. */
   Future<void> actualizarUsuario(UserModel usuario) async {
     try {
       return await _usersCollection.doc(usuario.id).update(usuario.toJson());
@@ -85,7 +134,14 @@ class FirebaseService {
     }
   }
 
-  // Métodos para partidos
+  /*********************  MÉTODOS PARA PARTIDOS ****************************/
+
+  /** Crea un nuevo partido en Firestore.
+     
+     [partido] Modelo del partido a crear.
+     
+     Retorna el ID del partido creado.
+     Lanza una excepción en caso de error. */
   Future<String> crearPartido(PartidoModel partido) async {
     try {
       final docRef = _partidosCollection.doc();
@@ -98,6 +154,10 @@ class FirebaseService {
     }
   }
 
+  /** Obtiene todos los partidos disponibles.
+     
+     Retorna una lista de PartidoModel.
+     Lanza una excepción en caso de error. */
   Future<List<PartidoModel>> obtenerPartidos() async {
     try {
       final querySnapshot = await _partidosCollection.get();
@@ -111,6 +171,12 @@ class FirebaseService {
     }
   }
 
+  /** Obtiene un partido específico por su ID.
+     
+     [partidoId] ID del partido a obtener.
+     
+     Retorna un PartidoModel si el partido existe, null en caso contrario.
+     Lanza una excepción en caso de error. */
   Future<PartidoModel?> obtenerPartidoPorId(String partidoId) async {
     try {
       final doc = await _partidosCollection.doc(partidoId).get();
@@ -124,6 +190,11 @@ class FirebaseService {
     }
   }
 
+  /** Actualiza los datos de un partido existente.
+     
+     [partido] Modelo del partido con los datos actualizados.
+     
+     Lanza una excepción en caso de error. */
   Future<void> actualizarPartido(PartidoModel partido) async {
     try {
       return await _partidosCollection.doc(partido.id).update(partido.toJson());
@@ -133,7 +204,14 @@ class FirebaseService {
     }
   }
 
-  // Métodos para equipos
+  /*******************  MÉTODOS PARA EQUIPOS ***********************/
+
+  /** Crea un nuevo equipo en Firestore.
+     
+     [equipo] Modelo del equipo a crear.
+     
+     Retorna el ID del equipo creado.
+     Lanza una excepción en caso de error. */
   Future<String> crearEquipo(EquipoModel equipo) async {
     try {
       final docRef = _equiposCollection.doc();
@@ -146,6 +224,10 @@ class FirebaseService {
     }
   }
 
+  /** Obtiene todos los equipos disponibles.
+     
+     Retorna una lista de EquipoModel.
+     Lanza una excepción en caso de error. */
   Future<List<EquipoModel>> obtenerEquipos() async {
     try {
       final querySnapshot = await _equiposCollection.get();
@@ -159,7 +241,10 @@ class FirebaseService {
     }
   }
 
-  // Método para escuchar cambios en equipos en tiempo real
+  /** Proporciona un stream para escuchar cambios en equipos en tiempo real.
+     
+     Retorna un Stream de lista de EquipoModel que se actualiza automáticamente
+     cuando hay cambios en la colección de equipos en Firestore. */
   Stream<List<EquipoModel>> obtenerEquiposStream() {
     try {
       return _equiposCollection.snapshots().map((snapshot) {
@@ -174,6 +259,12 @@ class FirebaseService {
     }
   }
 
+  /** Obtiene un equipo específico por su ID.
+     
+     [equipoId] ID del equipo a obtener.
+     
+     Retorna un EquipoModel si el equipo existe, null en caso contrario.
+     Lanza una excepción en caso de error. */
   Future<EquipoModel?> obtenerEquipoPorId(String equipoId) async {
     try {
       final doc = await _equiposCollection.doc(equipoId).get();
@@ -187,6 +278,11 @@ class FirebaseService {
     }
   }
 
+  /** Actualiza los datos de un equipo existente.
+     
+     [equipo] Modelo del equipo con los datos actualizados.
+     
+     Lanza una excepción en caso de error. */
   Future<void> actualizarEquipo(EquipoModel equipo) async {
     try {
       return await _equiposCollection.doc(equipo.id).update(equipo.toJson());
@@ -196,7 +292,14 @@ class FirebaseService {
     }
   }
 
-  // Métodos para pistas
+  /*****************  MÉTODOS PARA PISTAS *********************/
+
+  /** Crea una nueva pista deportiva en Firestore.
+     
+     [pista] Modelo de la pista a crear.
+     
+     Retorna el ID de la pista creada.
+     Lanza una excepción en caso de error. */
   Future<String> crearPista(PistaModel pista) async {
     try {
       final docRef = _pistasCollection.doc();
@@ -209,6 +312,10 @@ class FirebaseService {
     }
   }
 
+  /** Obtiene todas las pistas deportivas disponibles.
+     
+     Retorna una lista de PistaModel.
+     Lanza una excepción en caso de error. */
   Future<List<PistaModel>> obtenerPistas() async {
     try {
       final querySnapshot = await _pistasCollection.get();
@@ -222,6 +329,12 @@ class FirebaseService {
     }
   }
 
+  /** Obtiene una pista específica por su ID.
+     
+     [pistaId] ID de la pista a obtener.
+     
+     Retorna un PistaModel si la pista existe, null en caso contrario.
+     Lanza una excepción en caso de error. */
   Future<PistaModel?> obtenerPistaPorId(String pistaId) async {
     try {
       final doc = await _pistasCollection.doc(pistaId).get();
@@ -235,6 +348,11 @@ class FirebaseService {
     }
   }
 
+  /** Actualiza los datos de una pista existente.
+     
+     [pista] Modelo de la pista con los datos actualizados.
+     
+     Lanza una excepción en caso de error. */
   Future<void> actualizarPista(PistaModel pista) async {
     try {
       return await _pistasCollection.doc(pista.id).update(pista.toJson());
@@ -244,7 +362,15 @@ class FirebaseService {
     }
   }
 
-  // Métodos para almacenamiento
+  /********************  MÉTODOS PARA ALMACENAMIENTO **********************/
+
+  /** Sube una imagen a Firebase Storage.
+     
+     [path] Ruta donde se almacenará la imagen en Storage.
+     [file] Archivo de imagen a subir.
+     
+     Retorna la URL de descarga de la imagen subida.
+     Lanza una excepción en caso de error. */
   Future<String> subirImagen(String path, File file) async {
     try {
       final ref = _storage.ref().child(path);
@@ -257,6 +383,11 @@ class FirebaseService {
     }
   }
 
+  /** Elimina una imagen de Firebase Storage.
+     
+     [path] Ruta de la imagen a eliminar en Storage.
+     
+     Lanza una excepción en caso de error. */
   Future<void> eliminarImagen(String path) async {
     try {
       final ref = _storage.ref().child(path);

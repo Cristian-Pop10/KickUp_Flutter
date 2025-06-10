@@ -8,6 +8,11 @@ import 'package:kickup/src/controlador/perfil_controller.dart';
 import 'package:kickup/src/modelo/user_model.dart';
 import 'package:kickup/src/vista/configuracion_view.dart';
 
+/** Vista de perfil de usuario que permite visualizar y editar
+ * información personal, gestionar foto de perfil y acceder a
+ * configuraciones. Incluye sistema de puntos y validación
+ * completa de formularios.
+ */
 class PerfilView extends StatefulWidget {
   const PerfilView({
     Key? key,
@@ -25,7 +30,7 @@ class _PerfilViewState extends State<PerfilView> {
   bool _isEditing = false;
   bool _isUploadingImage = false;
 
-  // Lista de posiciones disponibles
+  // Lista de posiciones disponibles para jugadores
   final List<String> _posiciones = [
     'portero',
     'defensa',
@@ -33,7 +38,7 @@ class _PerfilViewState extends State<PerfilView> {
     'delantero',
   ];
 
-  // Controladores para los campos de texto
+  // Controladores para los campos de texto editables
   final TextEditingController _nombreController = TextEditingController();
   final TextEditingController _apellidosController = TextEditingController();
   final TextEditingController _edadController = TextEditingController();
@@ -41,7 +46,7 @@ class _PerfilViewState extends State<PerfilView> {
   final TextEditingController _telefonoController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
 
-  // Variable para almacenar la posición seleccionada
+  // Variable para almacenar la posición seleccionada en el dropdown
   String? _posicionSeleccionada;
 
   late final String? userId;
@@ -55,12 +60,8 @@ class _PerfilViewState extends State<PerfilView> {
 
   @override
   void dispose() {
-    // Guardar cambios automáticamente al salir de la pantalla
-    if (_isEditing) {
-      _guardarCambios();
-    }
 
-    // Liberar los controladores de texto
+    // Liberar los controladores de texto para evitar memory leaks
     _nombreController.dispose();
     _apellidosController.dispose();
     _edadController.dispose();
@@ -71,6 +72,7 @@ class _PerfilViewState extends State<PerfilView> {
     super.dispose();
   }
 
+  /** Carga los datos del usuario actual desde el controlador */
   Future<void> _cargarUsuario() async {
     setState(() {
       _isLoading = true;
@@ -89,14 +91,13 @@ class _PerfilViewState extends State<PerfilView> {
         _edadController.text = usuario.edad?.toString() ?? '';
         _nivelController.text = usuario.nivel?.toString() ?? '';
 
-        // Asegurarse de que la posición esté en minúsculas para coincidir con la lista
+        // Asegurar que la posición esté en minúsculas para coincidir con la lista
         _posicionSeleccionada = usuario.posicion?.toLowerCase();
 
-        // Verificar que la posición seleccionada esté en la lista
+        // Verificar que la posición seleccionada esté en la lista válida
         if (_posicionSeleccionada != null &&
             !_posiciones.contains(_posicionSeleccionada)) {
-          _posicionSeleccionada =
-              null; // Si no está en la lista, establecer como nulo
+          _posicionSeleccionada = null;
         }
 
         _telefonoController.text = usuario.telefono ?? '';
@@ -105,10 +106,11 @@ class _PerfilViewState extends State<PerfilView> {
     });
   }
 
+  /** Guarda los cambios realizados en el perfil con validación completa */
   Future<void> _guardarCambios() async {
     if (_usuario == null) return;
 
-    // Validar campos obligatorios
+    // Validar nombre obligatorio
     if (_nombreController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('El nombre es obligatorio')),
@@ -116,14 +118,13 @@ class _PerfilViewState extends State<PerfilView> {
       return;
     }
 
+    // Validar email obligatorio y formato
     if (_emailController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('El email es obligatorio')),
       );
       return;
     }
-
-    // Validar formato de email
     final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
     if (!emailRegex.hasMatch(_emailController.text.trim())) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -132,13 +133,42 @@ class _PerfilViewState extends State<PerfilView> {
       return;
     }
 
+    // Validar edad entre 16 y 60 años
+    final edad = int.tryParse(_edadController.text);
+    if (edad == null || edad < 16 || edad > 60) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('La edad debe estar entre 16 y 60 años')),
+      );
+      return;
+    }
+
+    // Validar nivel entre 1 y 5
+    final nivel = int.tryParse(_nivelController.text);
+    if (nivel == null || nivel < 1 || nivel > 5) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('El nivel debe estar entre 1 y 5')),
+      );
+      return;
+    }
+
+    // Validar teléfono de 6 dígitos (opcional)
+    final telefono = _telefonoController.text.trim();
+    final telefonoRegex = RegExp(r'^\d{9}$');
+    if (telefono.isNotEmpty && !telefonoRegex.hasMatch(telefono)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('El teléfono debe tener 9 dígitos')),
+      );
+      return;
+    }
+
+    // Crear usuario actualizado con los nuevos datos
     final usuarioActualizado = _usuario!.copyWith(
       nombre: _nombreController.text.trim(),
       apellidos: _apellidosController.text.trim(),
-      edad: int.tryParse(_edadController.text),
-      nivel: int.tryParse(_nivelController.text),
+      edad: edad,
+      nivel: nivel,
       posicion: _posicionSeleccionada,
-      telefono: _telefonoController.text.trim(),
+      telefono: telefono,
       email: _emailController.text.trim(),
     );
 
@@ -155,7 +185,7 @@ class _PerfilViewState extends State<PerfilView> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Perfil actualizado correctamente'),
-            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            backgroundColor: AppColors.primary(context),
           ),
         );
       } else {
@@ -169,6 +199,7 @@ class _PerfilViewState extends State<PerfilView> {
     }
   }
 
+  /** Cierra la sesión del usuario con confirmación */
   Future<void> _cerrarSesion() async {
     // Mostrar diálogo de confirmación
     final confirmar = await showDialog<bool>(
@@ -195,6 +226,7 @@ class _PerfilViewState extends State<PerfilView> {
     }
   }
 
+  /** Muestra las opciones para cambiar la foto de perfil */
   void _mostrarOpcionesImagen() async {
     if (_isUploadingImage) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -247,6 +279,7 @@ class _PerfilViewState extends State<PerfilView> {
                   }
                 },
               ),
+              // Opción para eliminar foto actual si existe
               if (_usuario?.profileImageUrl != null &&
                   _usuario!.profileImageUrl!.isNotEmpty)
                 ListTile(
@@ -264,13 +297,14 @@ class _PerfilViewState extends State<PerfilView> {
     );
   }
 
+  /** Sube y actualiza la foto de perfil con indicador de progreso */
   Future<void> _subirYActualizarFoto(File imagen) async {
     if (_usuario == null || _isUploadingImage) return;
 
     setState(() => _isUploadingImage = true);
 
     try {
-      // Mostrar diálogo de progreso
+      // Mostrar diálogo de progreso durante la subida
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -346,6 +380,7 @@ class _PerfilViewState extends State<PerfilView> {
     }
   }
 
+  /** Elimina la foto de perfil actual */
   Future<void> _eliminarFoto() async {
     if (_usuario?.id == null) return;
 
@@ -423,11 +458,12 @@ class _PerfilViewState extends State<PerfilView> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Foto de perfil y nombre
+                        // Sección de foto de perfil y nombre
                         Center(
                           child: Column(
                             children: [
                               const SizedBox(height: 20),
+                              // Avatar con funcionalidad de cambio de imagen
                               GestureDetector(
                                 onTap: _isUploadingImage
                                     ? null
@@ -450,7 +486,7 @@ class _PerfilViewState extends State<PerfilView> {
                                                         .isNotEmpty)
                                                 ? CachedNetworkImageProvider(
                                                     _usuario!.profileImageUrl!)
-                                                : null, // Sin imagen si no hay URL
+                                                : null,
                                             child: (_usuario!.profileImageUrl ==
                                                         null ||
                                                     _usuario!.profileImageUrl!
@@ -460,6 +496,7 @@ class _PerfilViewState extends State<PerfilView> {
                                                     color: Colors.white)
                                                 : null,
                                           ),
+                                    // Icono de cámara para indicar que se puede cambiar
                                     if (!_isUploadingImage)
                                       Positioned(
                                         bottom: 0,
@@ -487,6 +524,8 @@ class _PerfilViewState extends State<PerfilView> {
                               if (!_isUploadingImage) const SizedBox(height: 8),
                               if (!_isUploadingImage)
                                 const SizedBox(height: 16),
+                              
+                              // Nombre y apellidos (editable o solo lectura)
                               _isEditing
                                   ? Column(
                                       children: [
@@ -545,9 +584,8 @@ class _PerfilViewState extends State<PerfilView> {
                                             ),
                                           ],
                                         ),
-                                        const SizedBox(
-                                            width:
-                                                16), // Espacio entre nombre y puntos
+                                        const SizedBox(width: 16),
+                                        // Sistema de puntos del jugador
                                         Container(
                                           padding: const EdgeInsets.symmetric(
                                               horizontal: 12, vertical: 8),
@@ -595,7 +633,7 @@ class _PerfilViewState extends State<PerfilView> {
                                     ),
 
                               const SizedBox(height: 16),
-                              // Botón Editar Perfil
+                              // Botones de editar perfil y configuración
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
@@ -604,7 +642,7 @@ class _PerfilViewState extends State<PerfilView> {
                                       setState(() {
                                         _isEditing = !_isEditing;
                                         if (!_isEditing) {
-                                          // Si estábamos editando y cancelamos, restauramos los valores originales
+                                          // Restaurar valores originales al cancelar
                                           _nombreController.text =
                                               _usuario!.nombre ?? '';
                                           _apellidosController.text =
@@ -699,7 +737,7 @@ class _PerfilViewState extends State<PerfilView> {
                                         ?.color,
                                   )),
                               const SizedBox(height: 16),
-                              // Botón Guardar cambios (solo visible en modo edición)
+                              // Botón guardar cambios (solo visible en modo edición)
                               if (_isEditing)
                                 SizedBox(
                                   width: double.infinity,
@@ -737,6 +775,7 @@ class _PerfilViewState extends State<PerfilView> {
     );
   }
 
+  /** Construye un campo de información con modo edición/lectura */
   Widget _buildInfoField(
     String label,
     String value,
@@ -793,6 +832,7 @@ class _PerfilViewState extends State<PerfilView> {
     );
   }
 
+  /** Construye el campo específico para selección de posición */
   Widget _buildPosicionField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

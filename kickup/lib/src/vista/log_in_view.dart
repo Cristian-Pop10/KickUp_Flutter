@@ -5,6 +5,11 @@ import 'package:kickup/src/vista/partidos_view.dart';
 import 'package:kickup/src/vista/sign_up_view.dart';
 import '../preferences/pref_usuarios.dart';
 
+/** Página de inicio de sesión de la aplicación KickUp.
+ * Proporciona autenticación mediante Firebase Auth con validación
+ * de credenciales, manejo de errores específicos y navegación
+ * automática según el tipo de usuario (admin/jugador).
+ */
 class LogInPage extends StatefulWidget {
   static const String routeName = '/login';
   
@@ -19,6 +24,10 @@ class _LogInPageState extends State<LogInPage> {
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
 
+  /** Maneja el proceso de inicio de sesión con Firebase Auth.
+   * Incluye validación de credenciales, creación automática de documento
+   * en Firestore si no existe, y navegación a la vista principal.
+   */
   Future<void> _handleLogin() async {
     setState(() {
       _isLoading = true;
@@ -42,7 +51,6 @@ class _LogInPageState extends State<LogInPage> {
         PreferenciasUsuario.userEmail = email;
         PreferenciasUsuario.ultimaPagina = '/partidos';
         
-        print('✅ Sesión guardada con ID de usuario: $userId');
         
         // Verificar si el usuario existe en Firestore
         try {
@@ -55,7 +63,6 @@ class _LogInPageState extends State<LogInPage> {
               'email': email,
               'id': userId,
             });
-            print('✅ Usuario creado en Firestore durante login');
           }
         } catch (firestoreError) {
           print('⚠️ Error al verificar/crear usuario en Firestore: $firestoreError');
@@ -83,6 +90,7 @@ class _LogInPageState extends State<LogInPage> {
       
       String errorMessage = 'Error al iniciar sesión';
       
+      // Mapeo de errores específicos de Firebase Auth
       if (e.toString().contains('user-not-found')) {
         errorMessage = 'Usuario no encontrado';
       } else if (e.toString().contains('wrong-password')) {
@@ -151,6 +159,10 @@ class _LogInPageState extends State<LogInPage> {
   }
 }
 
+/** Sección superior de la pantalla de login.
+ * Contiene el título de la aplicación y el logo corporativo
+ * con efectos de sombra para mejorar la presentación visual.
+ */
 class _HeaderSection extends StatelessWidget {
   const _HeaderSection({Key? key}) : super(key: key);
 
@@ -187,6 +199,10 @@ class _HeaderSection extends StatelessWidget {
   }
 }
 
+/** Sección de entrada de datos con formulario de login.
+ * Incluye campos de email y contraseña, botón de inicio de sesión
+ * con estado de carga, y enlace para registro de nuevos usuarios.
+ */
 class _InputSection extends StatelessWidget {
   final TextEditingController emailController;
   final TextEditingController passwordController;
@@ -281,6 +297,10 @@ class _InputSection extends StatelessWidget {
   }
 }
 
+/** Campo de entrada personalizado con etiqueta y estilo consistente.
+ * Soporta modo de contraseña para ocultar texto y aplica
+ * el esquema de colores de la aplicación.
+ */
 class _InputField extends StatelessWidget {
   final String label;
   final bool isPassword;

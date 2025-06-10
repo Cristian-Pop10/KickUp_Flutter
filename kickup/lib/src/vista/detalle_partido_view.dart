@@ -4,15 +4,29 @@ import 'package:kickup/src/controlador/partido_controller.dart';
 import 'package:kickup/src/modelo/partido_model.dart';
 import 'package:kickup/src/servicio/user_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:kickup/src/vista/equipos_view.dart';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 
+/** Vista detallada de un partido deportivo.
+ * Muestra información completa del partido, lista de jugadores inscritos,
+ * y permite inscribirse/abandonar el partido. Incluye funcionalidad
+ * de tutorial interactivo para guiar a nuevos usuarios.
+ */
 class DetallePartidoView extends StatefulWidget {
+  /** ID del partido a mostrar */
   final String partidoId;
+  
+  /** ID del usuario actual */
   final String userId;
+  
+  /** Indica si se debe mostrar el tutorial */
+  final bool showTutorial; 
 
   const DetallePartidoView({
     Key? key,
     required this.partidoId,
     required this.userId,
+    this.showTutorial = false, 
   }) : super(key: key);
 
   @override
@@ -30,13 +44,71 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
   bool _usuarioInscrito = false;
   bool _procesandoSolicitud = false;
 
+  // Referencias para el tutorial
+  final GlobalKey _inscribirseKey = GlobalKey();
+  List<TargetFocus> targets = [];
+
   @override
   void initState() {
     super.initState();
     _cargarPartido();
+
+    // Iniciar tutorial si está habilitado
+    if (widget.showTutorial) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _showTutorial());
+    }
   }
 
-  /// Carga la información del partido y verifica si el usuario está inscrito
+  /** Muestra el tutorial interactivo para guiar al usuario.
+   * Utiliza la biblioteca TutorialCoachMark para resaltar
+   * elementos importantes de la interfaz con explicaciones.
+   */
+  void _showTutorial() {
+    targets = [
+      TargetFocus(
+        identify: "inscribirse",
+        keyTarget: _inscribirseKey,
+        contents: [
+          TargetContent(
+            child: const Text(
+              "¡Inscríbete al partido aquí!",
+              style: TextStyle(color: Colors.white, fontSize: 20),
+            ),
+          ),
+        ],
+      ),
+    ];
+
+    TutorialCoachMark(
+      targets: targets,
+      colorShadow: Colors.black,
+      textSkip: "Saltar",
+      paddingFocus: 8,
+      opacityShadow: 0.8,
+      onFinish: () {
+        // Al terminar, navega a EquiposView con tutorial
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => EquiposView(showTutorial: true),
+          ),
+        );
+        return false;
+      },
+      onSkip: () {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => EquiposView(showTutorial: true),
+          ),
+        );
+        return false;
+      },
+    ).show(context: context);
+  }
+
+  /** Carga la información del partido y verifica si el usuario está inscrito.
+   * Obtiene los datos del partido desde el controlador y verifica
+   * el estado de inscripción del usuario actual.
+   */
   Future<void> _cargarPartido() async {
     setState(() {
       _isLoading = true;
@@ -68,7 +140,10 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
     }
   }
 
-  /// Procesa la inscripción del usuario al partido
+  /** Procesa la inscripción del usuario al partido.
+   * Obtiene los datos del usuario y los envía al controlador
+   * para registrar la inscripción en el partido.
+   */
   Future<void> _inscribirsePartido() async {
     if (_procesandoSolicitud) return;
 
@@ -142,7 +217,10 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
     }
   }
 
-  /// Procesa el abandono del partido con confirmación
+  /** Procesa el abandono del partido con confirmación.
+   * Muestra un diálogo de confirmación antes de proceder
+   * a eliminar al usuario de la lista de jugadores.
+   */
   Future<void> _abandonarPartido() async {
     if (_procesandoSolicitud) return;
 
@@ -208,7 +286,9 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
     }
   }
 
-  /// Muestra diálogo de confirmación para abandonar partido
+  /** Muestra un diálogo de confirmación para abandonar el partido.
+   * @return true si el usuario confirma, false en caso contrario
+   */
   Future<bool?> _mostrarDialogoConfirmacion() {
     return showDialog<bool>(
       context: context,
@@ -231,7 +311,10 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
     );
   }
 
-  /// Formatea la fecha del partido en formato legible
+  /** Formatea la fecha del partido en formato legible español.
+   * @param fecha Fecha del partido a formatear
+   * @return Cadena con formato "día de mes, año - hora:minuto"
+   */
   String _formatearFecha(DateTime fecha) {
     final dia = fecha.day;
     final mes = _obtenerNombreMes(fecha.month);
@@ -242,7 +325,10 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
     return '$dia de $mes, $anio - $hora:$minuto';
   }
 
-  /// Obtiene el nombre del mes en español
+  /** Obtiene el nombre del mes en español.
+   * @param mes Número del mes (1-12)
+   * @return Nombre del mes en español
+   */
   String _obtenerNombreMes(int mes) {
     const meses = [
       'Enero',
@@ -274,7 +360,7 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
     );
   }
 
-  /// Construye el AppBar personalizado
+  /** Construye el AppBar personalizado */
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
@@ -293,7 +379,7 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
     );
   }
 
-  /// Construye el estado de error cuando no se encuentra el partido
+  /** Construye el estado de error cuando no se encuentra el partido */
   Widget _buildErrorState() {
     return Center(
       child: Column(
@@ -319,7 +405,7 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
     );
   }
 
-  /// Construye el contenido principal del partido
+  /** Construye el contenido principal del partido */
   Widget _buildPartidoContent() {
     return SingleChildScrollView(
       child: Container(
@@ -329,7 +415,7 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withAlpha(25), // Sombra sutil
+              color: Colors.black.withAlpha(25), 
               blurRadius: 8,
               offset: const Offset(0, 4),
             ),
@@ -349,7 +435,7 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
     );
   }
 
-  /// Construye el encabezado con fecha y tipo de partido
+  /** Construye el encabezado con fecha y tipo de partido */
   Widget _buildHeader() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -396,7 +482,7 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
     );
   }
 
-  /// Construye la información detallada del partido
+  /** Construye la información detallada del partido */
   Widget _buildPartidoInfo() {
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -421,7 +507,7 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
     );
   }
 
-  /// Construye el indicador de estado del partido
+  /** Construye el indicador de estado del partido (completo/incompleto) */
   Widget _buildEstadoPartido() {
     final isCompleto = _partido!.completo;
     final jugadoresFaltantes = _partido!.jugadoresFaltantes;
@@ -459,7 +545,7 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
     );
   }
 
-  /// Construye la sección de jugadores inscritos
+  /** Construye la sección de jugadores inscritos */
   Widget _buildPlayersSection() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -480,7 +566,7 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
     );
   }
 
-  /// Construye la lista de jugadores con StreamBuilder
+  /** Construye la lista de jugadores con actualizaciones en tiempo real */
   Widget _buildPlayersList() {
     return StreamBuilder<DocumentSnapshot>(
       stream: FirebaseFirestore.instance
@@ -533,7 +619,7 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
     );
   }
 
-  /// Construye un tile individual de jugador
+  /** Construye un tile individual de jugador con avatar y datos */
   Widget _buildPlayerTile(Map<String, dynamic> jugador) {
     final jugadorId = jugador['id'] as String?;
 
@@ -620,7 +706,7 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
     );
   }
 
-  /// Construye el botón de acción principal
+  /** Construye el botón de acción principal (inscribirse/abandonar) */
   Widget _buildActionButton() {
     final isCompleto = _partido!.completo;
     final puedeInscribirse = !isCompleto || _usuarioInscrito;
@@ -630,6 +716,7 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
       child: SizedBox(
         width: double.infinity,
         child: ElevatedButton(
+          key: _inscribirseKey, // Key para el tutorial
           onPressed: _procesandoSolicitud || (!puedeInscribirse)
               ? null
               : _usuarioInscrito
@@ -640,7 +727,7 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
                 ? Colors.red
                 : Theme.of(context).colorScheme.primary,
             foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 16),
+            padding: const EdgeInsets.symmetric(vertical: 13),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(30),
             ),
@@ -673,7 +760,7 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
                             ? 'Partido completo'
                             : 'Inscribirse al partido',
                 style: const TextStyle(
-                  fontSize: 18,
+                  fontSize: 15,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -684,7 +771,11 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
     );
   }
 
-  /// Construye una sección de información con icono
+  /** Construye una sección de información con icono.
+   * @param title Título de la información
+   * @param value Valor a mostrar
+   * @param icon Icono a mostrar junto al título
+   */
   Widget _buildInfoSection(String title, String value, IconData icon) {
     return Row(
       children: [

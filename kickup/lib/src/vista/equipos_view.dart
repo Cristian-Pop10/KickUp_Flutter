@@ -2,15 +2,26 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:kickup/src/componentes/app_styles.dart';
 import 'package:kickup/src/vista/crear_equipo_view.dart';
+import 'package:kickup/src/vista/pista_view.dart';
 import '../controlador/equipo_controller.dart';
 import '../modelo/equipo_model.dart';
 import 'detalle_equipo_view.dart';
 import '../componentes/bottom_nav_bar.dart';
 import '../controlador/auth_controller.dart';
+import '../componentes/equipo_card.dart'; // Importamos el nuevo componente
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 
+/** Vista principal para la gestión de equipos deportivos.
+ * Permite visualizar, buscar, crear y administrar equipos.
+ * Incluye funcionalidades diferenciadas para usuarios normales y administradores,
+ * así como un sistema de tutorial interactivo para nuevos usuarios.
+ */
 class EquiposView extends StatefulWidget {
-  const EquiposView({Key? key}) : super(key: key);
+  /** Indica si se debe mostrar el tutorial al cargar la vista */
+  final bool showTutorial;
+  
+  const EquiposView({Key? key, this.showTutorial = false}) : super(key: key);
 
   @override
   State<EquiposView> createState() => _EquiposViewState();
@@ -31,6 +42,12 @@ class _EquiposViewState extends State<EquiposView> {
   bool _modoSeleccion = false;
   late final String? userId;
 
+  // Claves globales para el tutorial
+  final GlobalKey _navBarKey = GlobalKey();
+  final GlobalKey _addTeamKey = GlobalKey();
+  final GlobalKey _primerEquipoKey = GlobalKey();
+  List<TargetFocus> targets = [];
+
   @override
   void initState() {
     super.initState();
@@ -38,6 +55,10 @@ class _EquiposViewState extends State<EquiposView> {
     _searchController.addListener(_filtrarEquipos);
     userId = FirebaseAuth.instance.currentUser?.uid;
     _verificarPermisos();
+
+    if (widget.showTutorial) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _showTutorial());
+    }
   }
 
   @override
@@ -47,8 +68,7 @@ class _EquiposViewState extends State<EquiposView> {
     super.dispose();
   }
 
-
-  /// Verifica si el usuario es admin
+  /** Verifica si el usuario actual es administrador */
   Future<void> _verificarPermisos() async {
     if (userId != null) {
       final esAdmin = await _equipoController.esUsuarioAdmin(userId!);
@@ -59,7 +79,7 @@ class _EquiposViewState extends State<EquiposView> {
     _cargarEquipos();
   }
 
-  /// Carga todos los equipos desde el controlador con manejo de errores
+  /** Carga todos los equipos desde el controlador con manejo de errores */
   Future<void> _cargarEquipos() async {
     setState(() {
       _isLoading = true;
@@ -89,7 +109,7 @@ class _EquiposViewState extends State<EquiposView> {
     }
   }
 
-  /// Filtra equipos basado en el texto de búsqueda
+  /** Filtra equipos basado en el texto de búsqueda en tiempo real */
   void _filtrarEquipos() {
     final query = _searchController.text.toLowerCase();
     setState(() {
@@ -99,7 +119,7 @@ class _EquiposViewState extends State<EquiposView> {
     });
   }
 
-  /// Navega al detalle del equipo y recarga la lista al volver
+  /** Navega al detalle del equipo y recarga la lista al volver */
   void _navegarADetalleEquipo(String equipoId) {
     // Permitir navegación tanto para usuarios normales como para admin
     Navigator.of(context)
@@ -114,7 +134,7 @@ class _EquiposViewState extends State<EquiposView> {
         .then((_) => _cargarEquipos()); // Recargar al volver
   }
 
-  /// Navega a crear equipo y recarga si se creó exitosamente
+  /** Navega a crear equipo y recarga si se creó exitosamente */
   Future<void> _navegarACrearEquipo() async {
     final result = await Navigator.of(context).push(
       MaterialPageRoute(
@@ -127,7 +147,7 @@ class _EquiposViewState extends State<EquiposView> {
     }
   }
 
-  /// Activa/desactiva modo selección (solo admin)
+  /** Activa/desactiva modo selección múltiple (solo administradores) */
   void _toggleModoSeleccion() {
     if (!_esAdmin) return;
 
@@ -139,7 +159,7 @@ class _EquiposViewState extends State<EquiposView> {
     });
   }
 
-  /// Selecciona/deselecciona un equipo (solo admin)
+  /** Selecciona/deselecciona un equipo en modo selección (solo administradores) */
   void _toggleSeleccionEquipo(String equipoId) {
     if (!_esAdmin || !_modoSeleccion) return;
 
@@ -152,7 +172,7 @@ class _EquiposViewState extends State<EquiposView> {
     });
   }
 
-  /// Elimina los equipos seleccionados (solo admin)
+  /** Elimina los equipos seleccionados después de confirmación (solo administradores) */
   Future<void> _eliminarEquiposSeleccionados() async {
     if (!_esAdmin || _equiposSeleccionados.isEmpty) return;
 
@@ -188,7 +208,7 @@ class _EquiposViewState extends State<EquiposView> {
     }
   }
 
-  /// Muestra diálogo de confirmación
+  /** Muestra diálogo de confirmación para acciones destructivas */
   Future<bool> _mostrarDialogoConfirmacion(
       String titulo, String mensaje) async {
     return await showDialog<bool>(
@@ -212,14 +232,92 @@ class _EquiposViewState extends State<EquiposView> {
         false;
   }
 
+  /** Muestra el tutorial interactivo para nuevos usuarios */
+  void _showTutorial() {
+    targets = [
+      TargetFocus(
+        identify: "primer_equipo",
+        keyTarget: _primerEquipoKey,
+        contents: [
+          TargetContent(
+            child: const Text(
+              "Aquí puedes ver los equipos.",
+              style: TextStyle(color: Colors.white, fontSize: 20),
+            ),
+          ),
+        ],
+      ),
+
+      TargetFocus(
+        identify: "add_team",
+        keyTarget: _addTeamKey,
+        contents: [
+          TargetContent(
+            child: const Text(
+              "Añade un equipo aquí.",
+              style: TextStyle(color: Colors.white, fontSize: 20),
+            ),
+          ),
+        ],
+      ),
+    ];
+
+    TutorialCoachMark(
+      targets: targets,
+      colorShadow: Colors.black,
+      textSkip: "Saltar",
+      paddingFocus: 8,
+      opacityShadow: 0.8,
+      onFinish: () {
+        if (_equiposFiltrados.isNotEmpty && userId != null) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => DetalleEquipoView(
+                equipoId: _equiposFiltrados.first.id,
+                userId: userId!,
+                showTutorial: true, // <-- Añade esto
+              ),
+            ),
+          );
+        } else {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => PistasView(showTutorial: true),
+            ),
+          );
+        }
+        return false;
+      },
+      onSkip: () {
+        if (_equiposFiltrados.isNotEmpty && userId != null) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => DetalleEquipoView(
+                equipoId: _equiposFiltrados.first.id,
+                userId: userId!,
+                showTutorial: true, 
+              ),
+            ),
+          );
+        } else {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => PistasView(showTutorial: true),
+            ),
+          );
+        }
+        return false;
+      },
+    ).show(context: context);
+  }
+
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
 
     return PopScope(
       canPop: !_modoSeleccion, // No permitir cerrar si está en modo selección
-      // ignore: deprecated_member_use
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, result) {
         if (!didPop && _modoSeleccion) {
           // Si no se cerró y está en modo selección, salir del modo
           setState(() {
@@ -249,48 +347,73 @@ class _EquiposViewState extends State<EquiposView> {
           ),
         ),
         bottomNavigationBar: BottomNavBar(
-          currentIndex: 1, // Índice fijo para la pestaña de equipos
+          key: _navBarKey,
+          currentIndex: 1,
           onTap: (index) {
-            // Navegación simplificada usando rutas nombradas
             if (index == 0) {
               Navigator.of(context).pushReplacementNamed('/partidos');
             } else if (index == 2) {
               Navigator.of(context).pushReplacementNamed('/pistas');
             }
           },
+          isAdmin: _esAdmin,
+        ),
+        floatingActionButton: FloatingActionButton(
+          key: _addTeamKey,
+          onPressed: _navegarACrearEquipo,
+          child: const Icon(Icons.add),
         ),
       ),
     );
   }
 
-  /// Construye el header con título
+  /** Construye el header con título y controles según el tipo de usuario */
   Widget _buildHeader() {
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
             children: [
-              const Text(
-                'Equipos',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              if (_esAdmin)
-                Text(
-                  _modoSeleccion ? 'Modo Eliminación' : 'Administrador',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: _modoSeleccion ? Colors.red[700] : Colors.green[700],
-                    fontWeight: FontWeight.w500,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Equipos',
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                   ),
-                ),
+                  const SizedBox(height: 4),
+                  if (_esAdmin)
+                    Text(
+                      _modoSeleccion ? 'Modo Eliminación' : 'Administrador',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: _modoSeleccion
+                            ? Colors.red[700]
+                            : Colors.green[700],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                ],
+              ),
             ],
           ),
+          // SOLO mostrar el botón de logout si es admin
+          if (_esAdmin)
+            IconButton(
+              icon: const Icon(Icons.logout, color: Colors.red),
+              tooltip: 'Cerrar sesión',
+              onPressed: () async {
+                await FirebaseAuth.instance.signOut();
+                if (context.mounted) {
+                  Navigator.of(context)
+                      .pushNamedAndRemoveUntil('/login', (route) => false);
+                }
+              },
+            ),
           // Mostrar avatar para usuarios normales, no para admin
           if (!_esAdmin)
-            // StreamBuilder para avatar en tiempo real
             StreamBuilder<DocumentSnapshot>(
               stream: FirebaseFirestore.instance
                   .collection('usuarios')
@@ -331,7 +454,7 @@ class _EquiposViewState extends State<EquiposView> {
     );
   }
 
-  /// Construye la barra de búsqueda con estilo personalizado
+  /** Construye la barra de búsqueda con estilo personalizado */
   Widget _buildSearchBar() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -368,7 +491,7 @@ class _EquiposViewState extends State<EquiposView> {
     );
   }
 
-  /// Construye los botones de acción (diferentes para usuario y admin)
+  /** Construye los botones de acción diferenciados por tipo de usuario */
   Widget _buildActionButtons() {
     if (_esAdmin) {
       // Vista de administrador: botones circulares verde (+) y rojo (-)
@@ -382,9 +505,10 @@ class _EquiposViewState extends State<EquiposView> {
                 height: 50,
                 margin: const EdgeInsets.only(right: 8),
                 child: ElevatedButton(
-                  onPressed: _modoSeleccion ? null : _navegarACrearEquipo, // Deshabilitar en modo selección
+                  onPressed: _modoSeleccion ? null : _navegarACrearEquipo,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _modoSeleccion ? Colors.grey : Colors.green,
+                    backgroundColor:
+                        _modoSeleccion ? Colors.grey : Colors.green,
                     foregroundColor: Colors.white,
                     shape: const CircleBorder(),
                   ),
@@ -418,37 +542,11 @@ class _EquiposViewState extends State<EquiposView> {
         ),
       );
     } else {
-      // Vista de usuario: botón rectangular normal
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: SizedBox(
-          width: double.infinity,
-          height: 40,
-          child: ElevatedButton.icon(
-            onPressed: _navegarACrearEquipo,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              foregroundColor: Theme.of(context).colorScheme.onPrimary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(25),
-              ),
-            ),
-            icon: const Icon(Icons.add, color: Colors.white),
-            label: const Text(
-              'AÑADIR',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ),
-      );
+      return const SizedBox.shrink();
     }
   }
 
-  /// Construye la lista de equipos con diferentes estados
+  /** Construye la lista de equipos en formato grid con diferentes estados */
   Widget _buildTeamsList() {
     return Expanded(
       child: _isLoading
@@ -479,15 +577,15 @@ class _EquiposViewState extends State<EquiposView> {
                   ),
                 )
               : RefreshIndicator(
-                  onRefresh: _cargarEquipos, // Pull-to-refresh
+                  onRefresh: _cargarEquipos,
                   child: GridView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2, // 2 columnas
-                      childAspectRatio: 0.85, // Proporción de aspecto
-                      crossAxisSpacing: 16, // Espacio horizontal
-                      mainAxisSpacing: 16, // Espacio vertical
+                      crossAxisCount: 2,
+                      childAspectRatio: 0.85,
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
                     ),
                     itemCount: _equiposFiltrados.length,
                     itemBuilder: (context, index) {
@@ -495,7 +593,8 @@ class _EquiposViewState extends State<EquiposView> {
                       final isSelected =
                           _equiposSeleccionados.contains(equipo.id);
 
-                      return _EquipoCard(
+                      return EquipoCard(
+                        key: index == 0 ? _primerEquipoKey : null,
                         nombre: equipo.nombre,
                         tipo: equipo.tipo,
                         logoUrl: equipo.logoUrl,
@@ -511,137 +610,6 @@ class _EquiposViewState extends State<EquiposView> {
                     },
                   ),
                 ),
-    );
-  }
-}
-
-/// Widget personalizado para mostrar cada tarjeta de equipo
-class _EquipoCard extends StatelessWidget {
-  final String nombre;
-  final String tipo;
-  final String logoUrl;
-  final bool esAdmin;
-  final bool modoSeleccion;
-  final bool seleccionado;
-  final VoidCallback onTap;
-  final VoidCallback? onLongPress;
-
-  const _EquipoCard({
-    Key? key,
-    required this.nombre,
-    required this.tipo,
-    required this.logoUrl,
-    required this.esAdmin,
-    required this.modoSeleccion,
-    required this.seleccionado,
-    required this.onTap,
-    this.onLongPress,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      onLongPress: onLongPress,
-      child: Stack(
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Contenedor principal de la imagen del equipo
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(15),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withAlpha(25),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                    border: seleccionado
-                        ? Border.all(color: Colors.blue, width: 3)
-                        : null,
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(15),
-                    child: logoUrl.isNotEmpty
-                        ? Image.network(
-                            logoUrl,
-                            fit: BoxFit.cover,
-                            // Fallback en caso de error al cargar imagen
-                            errorBuilder: (context, error, stackTrace) {
-                              return const Center(
-                                child: Icon(
-                                  Icons.sports_soccer,
-                                  size: 50,
-                                  color: Colors.grey,
-                                ),
-                              );
-                            },
-                          )
-                        : const Center(
-                            child: Icon(
-                              Icons.sports_soccer,
-                              size: 50,
-                              color: Colors.grey,
-                            ),
-                          ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              // Tipo del equipo
-              Text(
-                tipo,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.green[700],
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              // Nombre del equipo con overflow handling
-              Text(
-                nombre,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis, // Truncar texto largo
-              ),
-            ],
-          ),
-          // Checkbox para modo selección (solo admin)
-          if (esAdmin && modoSeleccion)
-            Positioned(
-              top: 8,
-              right: 8,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withAlpha(25),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Checkbox(
-                  value: seleccionado,
-                  onChanged: (_) => onTap(),
-                  activeColor: Colors.blue,
-                ),
-              ),
-            ),
-        ],
-      ),
     );
   }
 }

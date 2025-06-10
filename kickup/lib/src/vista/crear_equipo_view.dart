@@ -4,7 +4,13 @@ import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:io';
 
+/** Vista para crear un nuevo equipo.
+ * Permite al usuario ingresar información del equipo como nombre, tipo,
+ * descripción, nivel y logo. Integra con Firebase para almacenar los datos
+ * y subir imágenes. Incluye animaciones y validación de formulario.
+ */
 class CrearEquipoView extends StatefulWidget {
+  /** ID del usuario que está creando el equipo */
   final String userId;
 
   const CrearEquipoView({
@@ -32,9 +38,8 @@ class _CrearEquipoViewState extends State<CrearEquipoView>
   bool _subiendoImagen = false;
   String _tipoSeleccionado = 'Fútbol 7';
 
-  // Opciones de tipos de equipo con iconos y colores
+  /** Lista de tipos de equipo disponibles con sus metadatos */
   final List<Map<String, dynamic>> _tiposEquipo = [
-
     {
       'nombre': 'Fútbol 7',
       'icono': Icons.sports_soccer,
@@ -99,7 +104,10 @@ class _CrearEquipoViewState extends State<CrearEquipoView>
     super.dispose();
   }
 
-  /// Muestra opciones para seleccionar imagen con diseño mejorado
+  /** Muestra opciones para seleccionar imagen con diseño mejorado.
+   * Presenta un modal con opciones para seleccionar desde galería,
+   * cámara o eliminar la imagen actual si existe.
+   */
   Future<void> _mostrarOpcionesImagen() async {
     final ImageSource? source = await showModalBottomSheet<ImageSource>(
       context: context,
@@ -182,7 +190,12 @@ class _CrearEquipoViewState extends State<CrearEquipoView>
     }
   }
 
-  /// Widget para opciones de imagen
+  /** Construye un widget para una opción de selección de imagen.
+   * @param icon Icono a mostrar
+   * @param label Texto descriptivo
+   * @param color Color del contenedor y el icono
+   * @param onTap Función a ejecutar al tocar
+   */
   Widget _buildImageOption({
     required IconData icon,
     required String label,
@@ -218,7 +231,10 @@ class _CrearEquipoViewState extends State<CrearEquipoView>
     );
   }
 
-  /// Selecciona una imagen desde la fuente especificada
+  /** Selecciona una imagen desde la fuente especificada (cámara o galería).
+   * Actualiza el estado para mostrar la imagen seleccionada.
+   * @param source Fuente de la imagen (cámara o galería)
+   */
   Future<void> _seleccionarImagen(ImageSource source) async {
     setState(() => _subiendoImagen = true);
 
@@ -253,6 +269,11 @@ class _CrearEquipoViewState extends State<CrearEquipoView>
     }
   }
 
+  /** Sube el logo del equipo a Firebase Storage y devuelve la URL.
+   * @param logo Archivo de imagen a subir
+   * @param equipoId ID del equipo para nombrar el archivo
+   * @return URL de descarga de la imagen subida
+   */
   Future<String?> subirLogoEquipo(File logo, String equipoId) async {
     final storageRef =
         FirebaseStorage.instance.ref().child('equipos').child('$equipoId.jpg');
@@ -260,7 +281,10 @@ class _CrearEquipoViewState extends State<CrearEquipoView>
     return await uploadTask.ref.getDownloadURL();
   }
 
-  /// Muestra el selector de tipo de equipo mejorado
+  /** Muestra el selector de tipo de equipo en un modal.
+   * Permite al usuario elegir entre diferentes tipos de equipos
+   * con una interfaz visual mejorada.
+   */
   void _mostrarSelectorTipo() {
     showModalBottomSheet(
       context: context,
@@ -395,7 +419,11 @@ class _CrearEquipoViewState extends State<CrearEquipoView>
     );
   }
 
-  /// Guarda el equipo
+  /** Guarda el equipo en Firestore.
+   * Valida el formulario, sube el logo si existe y crea el documento
+   * del equipo con toda la información. Incluye al creador como primer
+   * miembro del equipo.
+   */
   Future<void> _guardarEquipo() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
@@ -513,7 +541,7 @@ class _CrearEquipoViewState extends State<CrearEquipoView>
     );
   }
 
-  /// Construye el AppBar mejorado
+  /** Construye el AppBar mejorado con estilo personalizado */
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       backgroundColor: Colors.transparent,
@@ -540,7 +568,7 @@ class _CrearEquipoViewState extends State<CrearEquipoView>
     );
   }
 
-  /// Construye el estado de carga
+  /** Construye el estado de carga con animación centrada */
   Widget _buildLoadingState() {
     return Center(
       child: Column(
@@ -568,7 +596,7 @@ class _CrearEquipoViewState extends State<CrearEquipoView>
     );
   }
 
-  /// Construye el contenido del formulario
+  /** Construye el contenido del formulario con animaciones */
   Widget _buildFormContent() {
     return FadeTransition(
       opacity: _fadeAnimation,
@@ -604,7 +632,7 @@ class _CrearEquipoViewState extends State<CrearEquipoView>
     );
   }
 
-  /// Construye la sección del logo mejorada
+  /** Construye la sección del logo con selector de imagen */
   Widget _buildLogoSection() {
     return Center(
       child: Column(
@@ -673,7 +701,7 @@ class _CrearEquipoViewState extends State<CrearEquipoView>
     );
   }
 
-  /// Construye el campo de nombre mejorado
+  /** Construye el campo de nombre con validación */
   Widget _buildNombreField() {
     return _buildFieldContainer(
       label: 'Nombre del equipo',
@@ -694,7 +722,7 @@ class _CrearEquipoViewState extends State<CrearEquipoView>
     );
   }
 
-  /// Construye el campo de tipo mejorado
+  /** Construye el campo de tipo con selector */
   Widget _buildTipoField() {
     return _buildFieldContainer(
       label: 'Tipo de equipo',
@@ -715,7 +743,7 @@ class _CrearEquipoViewState extends State<CrearEquipoView>
     );
   }
 
-  /// Construye el campo de nivel mejorado
+  /** Construye el campo de nivel con validación numérica */
   Widget _buildNivelField() {
     return _buildFieldContainer(
       label: 'Nivel del equipo',
@@ -738,7 +766,7 @@ class _CrearEquipoViewState extends State<CrearEquipoView>
     );
   }
 
-  /// Construye el campo de descripción mejorado
+  /** Construye el campo de descripción multilinea */
   Widget _buildDescripcionField() {
     return _buildFieldContainer(
       label: 'Descripción',
@@ -761,7 +789,11 @@ class _CrearEquipoViewState extends State<CrearEquipoView>
     );
   }
 
-  /// Construye un contenedor de campo con etiqueta e icono
+  /** Construye un contenedor de campo con etiqueta e icono.
+   * @param label Etiqueta del campo
+   * @param icon Icono representativo
+   * @param child Widget hijo (generalmente un TextField)
+   */
   Widget _buildFieldContainer({
     required String label,
     required IconData icon,
@@ -815,7 +847,7 @@ class _CrearEquipoViewState extends State<CrearEquipoView>
     );
   }
 
-  /// Construye el botón de guardar mejorado
+  /** Construye el botón de guardar con gradiente y animación */
   Widget _buildGuardarButton() {
     return Container(
       width: double.infinity,
@@ -879,7 +911,16 @@ class _CrearEquipoViewState extends State<CrearEquipoView>
     );
   }
 
-  /// Construye un campo de texto mejorado
+  /** Construye un campo de texto con estilo personalizado.
+   * @param controller Controlador del campo
+   * @param hintText Texto de ayuda
+   * @param keyboardType Tipo de teclado
+   * @param readOnly Si es de solo lectura
+   * @param onTap Función al tocar
+   * @param suffixIcon Icono al final del campo
+   * @param validator Función de validación
+   * @param maxLines Número máximo de líneas
+   */
   Widget _buildTextField({
     required TextEditingController controller,
     required String hintText,

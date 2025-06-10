@@ -4,11 +4,13 @@ import 'dart:math' as math;
 class BottomNavBar extends StatefulWidget {
   final int currentIndex;
   final Function(int) onTap;
+  final isAdmin;
 
   const BottomNavBar({
     Key? key,
     required this.currentIndex,
     required this.onTap,
+    this.isAdmin = false,
   }) : super(key: key);
 
   @override
@@ -179,7 +181,9 @@ class _BottomNavBarState extends State<BottomNavBar>
           // Elementos de navegación
           Row(
             children: [
-              _buildNavItem(0, Icons.sports_soccer, 'Partidos'),
+              _buildNavItem(0, 
+              widget.isAdmin ? Icons.emoji_people_outlined : Icons.sports_soccer,
+              widget.isAdmin ? 'Jugadores' : 'Partidos'),
               _buildNavItem(1, Icons.people, 'Equipos'),
               _buildNavItem(2, Icons.place, 'Pistas'),
             ],

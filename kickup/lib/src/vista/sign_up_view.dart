@@ -5,6 +5,12 @@ import '../modelo/signup_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'partidos_view.dart';
 
+/** Vista de registro de usuarios.
+ * Permite a nuevos usuarios crear una cuenta proporcionando
+ * información personal y deportiva. Incluye validación de campos,
+ * selección de posición de juego y navegación a la vista principal
+ * tras un registro exitoso.
+ */
 class RegistroView extends StatefulWidget {
   const RegistroView({Key? key}) : super(key: key);
 
@@ -13,6 +19,7 @@ class RegistroView extends StatefulWidget {
 }
 
 class _RegistroViewState extends State<RegistroView> {
+  // Clave global para el formulario y controladores para los campos
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -25,6 +32,7 @@ class _RegistroViewState extends State<RegistroView> {
   final _telefonoController = TextEditingController();
   bool _isLoading = false;
 
+  // Lista de posiciones disponibles para el dropdown
   final List<String> _posiciones = [
     'portero',
     'defensa',
@@ -36,6 +44,7 @@ class _RegistroViewState extends State<RegistroView> {
 
   @override
   void dispose() {
+    // Liberar recursos de los controladores
     _emailController.dispose();
     _passwordController.dispose();
     _nombreController.dispose();
@@ -47,6 +56,7 @@ class _RegistroViewState extends State<RegistroView> {
     super.dispose();
   }
 
+  /** Procesa el registro del usuario con los datos del formulario */
   Future<void> _register() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
@@ -58,19 +68,26 @@ class _RegistroViewState extends State<RegistroView> {
         password: _passwordController.text,
       );
 
-      // Crea el UserModel con los nuevos campos
+      // Función auxiliar para capitalizar la primera letra
+      String _capitalizeFirstLetter(String text) {
+        if (text.isEmpty) return text;
+        return text[0].toUpperCase() + text.substring(1);
+      }
+
+      // Crea el UserModel con los datos del formulario
       final user = UserModel(
-        id: null, 
+        id: null,
         email: _emailController.text,
         password: _passwordController.text,
         edad: int.tryParse(_edadController.text),
         nivel: int.tryParse(_nivelController.text),
         posicion: _posicionController.text,
         telefono: _telefonoController.text,
-        nombre: _nombreController.text,
-        apellidos: _apellidosController.text,
+        nombre: _capitalizeFirstLetter(_nombreController.text),
+        apellidos: _capitalizeFirstLetter(_apellidosController.text),
       );
 
+      // Intenta registrar al usuario
       final success = await _authController.registerWithUser(user);
 
       setState(() {
@@ -81,13 +98,14 @@ class _RegistroViewState extends State<RegistroView> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Registro exitoso')),
         );
-        // Obtén el UID del usuario actual
+
+        // Navega a la vista principal si el registro fue exitoso
         final currentUser = FirebaseAuth.instance.currentUser;
         if (currentUser != null) {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (context) => PartidosView(),
+              builder: (context) => PartidosView(showTutorial: true),
             ),
           );
         }
@@ -105,7 +123,7 @@ class _RegistroViewState extends State<RegistroView> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Sección verde superior
+            // Sección verde superior con el formulario
             Container(
               width: double.infinity,
               decoration: const BoxDecoration(
@@ -134,6 +152,7 @@ class _RegistroViewState extends State<RegistroView> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Campo de email
                           const Text(
                             'Email',
                             style: TextStyle(
@@ -160,6 +179,8 @@ class _RegistroViewState extends State<RegistroView> {
                             keyboardType: TextInputType.emailAddress,
                           ),
                           const SizedBox(height: 20),
+                          
+                          // Campo de contraseña
                           const Text(
                             'Contraseña',
                             style: TextStyle(
@@ -186,6 +207,8 @@ class _RegistroViewState extends State<RegistroView> {
                             obscureText: true,
                           ),
                           const SizedBox(height: 20),
+                          
+                          // Campo de nombre
                           const Text(
                             'Nombre',
                             style: TextStyle(
@@ -212,6 +235,8 @@ class _RegistroViewState extends State<RegistroView> {
                                   horizontal: 20, vertical: 16),
                             ),
                           ),
+                          
+                          // Campo de apellidos
                           const Text(
                             'Apellidos',
                             style: TextStyle(
@@ -239,6 +264,8 @@ class _RegistroViewState extends State<RegistroView> {
                             ),
                           ),
                           const SizedBox(height: 20),
+                          
+                          // Campo de edad
                           const Text(
                             'Edad',
                             style: TextStyle(
@@ -270,8 +297,10 @@ class _RegistroViewState extends State<RegistroView> {
                             keyboardType: TextInputType.number,
                           ),
                           const SizedBox(height: 20),
+                          
+                          // Campo de nivel de juego
                           const Text(
-                            'Nivel',
+                            'Nivel (1-5)',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 18,
@@ -301,6 +330,8 @@ class _RegistroViewState extends State<RegistroView> {
                             keyboardType: TextInputType.number,
                           ),
                           const SizedBox(height: 20),
+                          
+                          // Selector de posición
                           const Text(
                             'Posición',
                             style: TextStyle(
@@ -326,7 +357,8 @@ class _RegistroViewState extends State<RegistroView> {
                               return DropdownMenuItem<String>(
                                 value: posicion,
                                 child: Text(
-                                  posicion[0].toUpperCase() + posicion.substring(1),
+                                  posicion[0].toUpperCase() +
+                                      posicion.substring(1),
                                   style: const TextStyle(fontSize: 16),
                                 ),
                               );
@@ -344,6 +376,8 @@ class _RegistroViewState extends State<RegistroView> {
                             },
                           ),
                           const SizedBox(height: 20),
+                          
+                          // Campo de teléfono
                           const Text(
                             'Teléfono',
                             style: TextStyle(
@@ -380,7 +414,7 @@ class _RegistroViewState extends State<RegistroView> {
               ),
             ),
 
-            // Sección blanca inferior
+            // Sección blanca inferior con botones y logo
             Container(
               height: MediaQuery.of(context).size.height * 0.5,
               width: double.infinity,
@@ -388,6 +422,7 @@ class _RegistroViewState extends State<RegistroView> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
+                  // Botón de registro con indicador de carga
                   _isLoading
                       ? const CircularProgressIndicator()
                       : ElevatedButton(
@@ -411,6 +446,8 @@ class _RegistroViewState extends State<RegistroView> {
                           ),
                         ),
                   const SizedBox(height: 16),
+                  
+                  // Enlace para ir a inicio de sesión
                   TextButton(
                     onPressed: () {
                       Navigator.pushAndRemoveUntil(
@@ -431,6 +468,7 @@ class _RegistroViewState extends State<RegistroView> {
                     ),
                   ),
                   const SizedBox(height: 30),
+                  
                   Image.asset(
                     'assets/arbitro.png',
                     width: 150,

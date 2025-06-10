@@ -1,15 +1,39 @@
+/** Modelo que representa una pista deportiva en la aplicación.
+   Contiene toda la información relacionada con una instalación deportiva,
+   incluyendo ubicación geográfica, características y disponibilidad. */
 class PistaModel {
+  /** Identificador único de la pista */
   final String id;
+  
+  /** Nombre de la pista deportiva */
   final String nombre;
+  
+  /** Dirección física de la pista */
   final String direccion;
+  
+  /** Coordenada de latitud para ubicación en mapa */
   final double latitud;
+  
+  /** Coordenada de longitud para ubicación en mapa */
   final double longitud;
+  
+  /** Tipo de pista */
   final String? tipo;
+  
+  /** Descripción opcional con detalles adicionales de la pista */
   final String? descripcion;
+  
+  /** Precio por hora de alquiler de la pista */
   final double? precio;
+  
+  /** Indica si la pista está disponible para reservas */
   final bool disponible;
+  
+  /** URL de la imagen principal de la pista */
   final String? imagenUrl;
 
+  /** Constructor principal que inicializa una pista con sus propiedades.
+     Requiere los campos obligatorios y permite valores opcionales. */
   PistaModel({
     required this.id,
     required this.nombre,
@@ -23,7 +47,8 @@ class PistaModel {
     this.imagenUrl,
   });
 
-  // Método para crear una copia del modelo con algunos campos modificados
+  /** Crea una copia de la pista con propiedades específicas modificadas.
+     Útil para actualizar una pista sin modificar la original. */
   PistaModel copyWith({
     String? id,
     String? nombre,
@@ -50,7 +75,8 @@ class PistaModel {
     );
   }
 
-  // Método para convertir el modelo a un mapa (para Firestore)
+  /** Convierte la instancia de PistaModel a un mapa de datos.
+     Utilizado para serializar la pista para almacenamiento en Firestore o JSON. */
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -66,7 +92,9 @@ class PistaModel {
     };
   }
 
-  // Método para crear un modelo a partir de un mapa (desde Firestore)
+  /** Crea una instancia de PistaModel a partir de un mapa de datos.
+     Utilizado para deserializar datos de Firestore o JSON.
+     Maneja valores nulos y conversiones de tipos de forma segura. */
   factory PistaModel.fromJson(Map<String, dynamic> json) {
     return PistaModel(
       id: json['id'] ?? '',

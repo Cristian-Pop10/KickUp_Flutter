@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -15,26 +16,32 @@ import 'package:kickup/src/vista/log_in_view.dart';
 import 'package:kickup/src/vista/partidos_view.dart';
 import 'package:kickup/src/vista/perfil_view.dart';
 import 'package:kickup/src/vista/pista_view.dart';
+import 'package:kickup/src/vista/jugadores_view.dart'; 
 import 'firebase_options.dart';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 
-/// Manejador para mensajes de Firebase recibidos cuando la app está en segundo plano
-/// Esta función debe ser de nivel superior (no dentro de una clase) y sin estado
+/** Manejador para mensajes de Firebase recibidos cuando la app está en segundo plano.
+ * Se ejecuta de forma independiente y debe inicializar Firebase para procesar
+ * correctamente los mensajes push.
+ */
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // Inicializar Firebase para poder procesar el mensaje
   await Firebase.initializeApp();
   print('Mensaje recibido en background: ${message.messageId}');
 }
 
-/// Punto de entrada principal de la aplicación
+/** Punto de entrada principal de la aplicación KickUp.
+ * Configura todos los servicios necesarios, verifica el estado de autenticación
+ * y determina la ruta inicial según el tipo de usuario.
+ */
 void main() async {
   // Asegurar que Flutter esté inicializado antes de usar plugins
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Inicializar Firebase con las opciones específicas de la plataforma
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  
+
   // Inicializar las preferencias de usuario (SharedPreferences)
   await PreferenciasUsuario.init();
 
@@ -52,6 +59,17 @@ void main() async {
   final isAuthenticated = currentUser != null;
   final userId = currentUser?.uid ?? '';
 
+  // Comprobar si es admin antes de arrancar la app
+  bool esAdmin = false;
+  if (isAuthenticated) {
+    final doc = await FirebaseFirestore.instance
+        .collection('usuarios')
+        .doc(userId)
+        .get();
+    final data = doc.data();
+    esAdmin = data?['esAdmin'] == true;
+  }
+
   // Iniciar la aplicación con el proveedor de tema
   runApp(
     ChangeNotifierProvider(
@@ -59,20 +77,26 @@ void main() async {
       child: KickUpApp(
         isAuthenticated: isAuthenticated,
         userId: userId,
+        esAdmin: esAdmin, 
       ),
     ),
   );
 }
 
-/// Widget principal de la aplicación KickUp
+/** Widget principal de la aplicación KickUp.
+ * Maneja la configuración de temas, rutas, notificaciones push
+ * y la navegación inicial basada en el estado del usuario.
+ */
 class KickUpApp extends StatefulWidget {
   final bool isAuthenticated;
   final String userId;
+  final bool esAdmin;
 
   const KickUpApp({
     Key? key,
     required this.isAuthenticated,
     required this.userId,
+    required this.esAdmin,
   }) : super(key: key);
 
   @override
@@ -90,11 +114,11 @@ class _KickUpAppState extends State<KickUpApp> {
     _initFirebaseMessaging();
   }
 
-  /// Configura Firebase Messaging para notificaciones push
+  /** Configura Firebase Messaging para notificaciones push */
   Future<void> _initFirebaseMessaging() async {
     FirebaseMessaging messaging = FirebaseMessaging.instance;
 
-    // Solicitar permisos para notificaciones (especialmente importante en iOS)
+    // Solicitar permisos para notificaciones 
     NotificationSettings settings = await messaging.requestPermission(
       alert: true,
       badge: true,
@@ -116,7 +140,8 @@ class _KickUpAppState extends State<KickUpApp> {
 
       // Configurar listener para mensajes en primer plano
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-        print('Mensaje recibido en primer plano: ${message.notification?.title}');
+        print(
+            'Mensaje recibido en primer plano: ${message.notification?.title}');
       });
     } else {
       print('Permisos de notificación denegados');
@@ -134,10 +159,12 @@ class _KickUpAppState extends State<KickUpApp> {
       theme: _lightTheme(), // Tema claro
       darkTheme: _darkTheme(), // Tema oscuro
       themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-      
+
       // Ruta inicial basada en el estado de autenticación
-      initialRoute: widget.isAuthenticated ? '/partidos' : '/login',
-      
+      initialRoute: widget.isAuthenticated
+          ? (widget.esAdmin ? '/jugadores' : '/partidos')
+          : '/login',
+
       // Generador de rutas dinámico para manejar parámetros en URLs
       onGenerateRoute: (settings) {
         // Extraer argumentos y usar ID de usuario si está disponible
@@ -149,13 +176,39 @@ class _KickUpAppState extends State<KickUpApp> {
           case '/login':
             return MaterialPageRoute(builder: (_) => LogInPage());
           case '/partidos':
-            return MaterialPageRoute(builder: (_) => PartidosView());
+            // Comprobar si el usuario es admin y mostrar la pantalla correspondiente
+            return MaterialPageRoute(
+              builder: (_) => FutureBuilder<DocumentSnapshot>(
+                future: FirebaseFirestore.instance
+                    .collection('usuarios')
+                    .doc(FirebaseAuth.instance.currentUser?.uid)
+                    .get(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const Scaffold(
+                      body: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+                  final data = snapshot.data!.data() as Map<String, dynamic>?;
+                  final esAdmin = data?['esAdmin'] == true;
+                  if (esAdmin) {
+                    return const JugadoresView(); 
+                  } else {
+                    return const PartidosView();
+                  }
+                },
+              ),
+            );
           case '/equipos':
             return MaterialPageRoute(builder: (_) => EquiposView());
           case '/pistas':
             return MaterialPageRoute(builder: (_) => PistasView());
           case '/perfil':
             return MaterialPageRoute(builder: (_) => PerfilView());
+          case '/jugadores':
+            return MaterialPageRoute(
+              builder: (_) => JugadoresView(),
+            );
           default:
             // Rutas dinámicas con parámetros
             if (settings.name!.startsWith('/detalle-partido/')) {
@@ -188,7 +241,7 @@ class _KickUpAppState extends State<KickUpApp> {
     );
   }
 
-  /// Define el tema claro de la aplicación
+  /** Define el tema claro de la aplicación con colores y estilos personalizados */
   ThemeData _lightTheme() {
     final base = ThemeData.light();
 
@@ -202,7 +255,7 @@ class _KickUpAppState extends State<KickUpApp> {
       primaryColor: const Color(0xFF5A9A7A), // Verde principal
       scaffoldBackgroundColor: const Color(0xFFD7EAD9), // Fondo verde claro
       cardColor: const Color(0xFFD2C9A0), // Color de tarjetas
-      
+
       // Configuración de AppBar transparente
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
@@ -214,7 +267,7 @@ class _KickUpAppState extends State<KickUpApp> {
           fontWeight: FontWeight.bold,
         ),
       ),
-      
+
       // Estilo de botones elevados
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
@@ -225,7 +278,7 @@ class _KickUpAppState extends State<KickUpApp> {
           ),
         ),
       ),
-      
+
       // Estilo de campos de texto
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -240,7 +293,7 @@ class _KickUpAppState extends State<KickUpApp> {
     );
   }
 
-  /// Define el tema oscuro de la aplicación
+  /** Define el tema oscuro de la aplicación con colores y estilos adaptados */
   ThemeData _darkTheme() {
     final base = ThemeData.dark();
 
@@ -253,7 +306,7 @@ class _KickUpAppState extends State<KickUpApp> {
       ),
       scaffoldBackgroundColor: const Color(0xFF1C1C1C), // Fondo casi negro
       cardColor: const Color(0xFF2C2C2C), // Color de tarjetas oscuro
-      
+
       // Configuración de AppBar transparente
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
@@ -265,7 +318,7 @@ class _KickUpAppState extends State<KickUpApp> {
           fontWeight: FontWeight.bold,
         ),
       ),
-      
+
       // Estilo de botones elevados
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
@@ -276,7 +329,7 @@ class _KickUpAppState extends State<KickUpApp> {
           ),
         ),
       ),
-      
+
       // Estilo de campos de texto
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -285,7 +338,8 @@ class _KickUpAppState extends State<KickUpApp> {
           borderRadius: BorderRadius.circular(15),
           borderSide: BorderSide.none,
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       ),
     );
   }

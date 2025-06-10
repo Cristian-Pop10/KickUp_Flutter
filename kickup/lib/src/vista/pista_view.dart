@@ -9,16 +9,24 @@ import '../modelo/pista_model.dart';
 import 'detalle_pista_view.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 
+/** Vista principal para la gestión de pistas deportivas.
+ * Permite visualizar pistas en formato lista o mapa, buscar por
+ * diferentes criterios, y para administradores: crear, seleccionar
+ * y eliminar pistas. Incluye integración con Google Maps y sistema
+ * de tutorial interactivo.
+ */
 class PistasView extends StatefulWidget {
-  const PistasView({Key? key}) : super(key: key);
+  final bool showTutorial;
+  const PistasView({Key? key, this.showTutorial = false}) : super(key: key);
 
   @override
   _PistasViewState createState() => _PistasViewState();
 }
 
 class _PistasViewState extends State<PistasView> {
-  // Controlador para manejar la lógica de pistas
+  // Controladores para la lógica de negocio y búsqueda
   final PistaController _pistaController = PistaController();
   final TextEditingController _searchController = TextEditingController();
 
@@ -34,6 +42,13 @@ class _PistasViewState extends State<PistasView> {
   bool _esAdmin = false; // Indica si el usuario es administrador
   bool _modoSeleccion = false; // Modo selección para eliminar pistas
 
+  // Claves globales para el sistema de tutorial
+  final GlobalKey _navBarKey = GlobalKey();
+  final GlobalKey _addPistaKey = GlobalKey();
+  final GlobalKey _verMapaKey = GlobalKey();
+  final GlobalKey _detallePistaKey = GlobalKey();
+  List<TargetFocus> targets = [];
+
   @override
   void initState() {
     super.initState();
@@ -41,6 +56,11 @@ class _PistasViewState extends State<PistasView> {
     _requestLocationPermission(); // Solicitar permisos de ubicación
     _verificarPermisos();
     _searchController.addListener(_filtrarPistas);
+
+    // Mostrar tutorial si es necesario
+    if (widget.showTutorial) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _showTutorial());
+    }
   }
 
   @override
@@ -51,10 +71,9 @@ class _PistasViewState extends State<PistasView> {
     super.dispose();
   }
 
-  /// Verifica si el usuario es admin
+  /** Verifica si el usuario actual es administrador */
   Future<void> _verificarPermisos() async {
     if (userId != null) {
-      // Asumimos que existe un método similar al de equipos para verificar si es admin
       final esAdmin = await _pistaController.esUsuarioAdmin(userId!);
       setState(() {
         _esAdmin = esAdmin;
@@ -63,7 +82,7 @@ class _PistasViewState extends State<PistasView> {
     _cargarPistas();
   }
 
-  /// Solicita permisos de ubicación al usuario
+  /** Solicita permisos de ubicación al usuario para funcionalidades del mapa */
   Future<void> _requestLocationPermission() async {
     final status = await Permission.location.status;
     if (!status.isGranted) {
@@ -71,7 +90,7 @@ class _PistasViewState extends State<PistasView> {
     }
   }
 
-  /// Carga todas las pistas y crea marcadores para el mapa
+  /** Carga todas las pistas y crea marcadores para el mapa */
   Future<void> _cargarPistas() async {
     setState(() {
       _isLoading = true;
@@ -80,7 +99,7 @@ class _PistasViewState extends State<PistasView> {
     try {
       final pistas = await _pistaController.obtenerPistas();
 
-      // Crear marcadores para cada pista
+      // Crear marcadores para cada pista con color según disponibilidad
       final markers = pistas.map((pista) {
         return Marker(
           markerId: MarkerId(pista.id),
@@ -121,7 +140,7 @@ class _PistasViewState extends State<PistasView> {
     }
   }
 
-  /// Filtra pistas basado en el texto de búsqueda
+  /** Filtra pistas basado en el texto de búsqueda */
   void _filtrarPistas() {
     final query = _searchController.text.toLowerCase();
     setState(() {
@@ -134,7 +153,7 @@ class _PistasViewState extends State<PistasView> {
     });
   }
 
-  /// Navega al detalle de la pista y recarga al volver
+  /** Navega al detalle de la pista y recarga al volver */
   Future<void> _navegarADetallePista(String pistaId) async {
     await Navigator.push(
       context,
@@ -148,7 +167,7 @@ class _PistasViewState extends State<PistasView> {
     _cargarPistas(); // Recargar pistas al volver
   }
 
-  /// Navega a crear pista y recarga si se creó exitosamente
+  /** Navega a crear pista y recarga si se creó exitosamente */
   Future<void> _navegarACrearPista() async {
     final result = await Navigator.of(context).push(
       MaterialPageRoute(
@@ -161,7 +180,7 @@ class _PistasViewState extends State<PistasView> {
     }
   }
 
-  /// Activa/desactiva modo selección (solo admin)
+  /** Activa/desactiva modo selección (solo admin) */
   void _toggleModoSeleccion() {
     if (!_esAdmin) return;
 
@@ -173,7 +192,7 @@ class _PistasViewState extends State<PistasView> {
     });
   }
 
-  /// Selecciona/deselecciona una pista (solo admin)
+  /** Selecciona/deselecciona una pista (solo admin) */
   void _toggleSeleccionPista(String pistaId) {
     if (!_esAdmin || !_modoSeleccion) return;
 
@@ -186,7 +205,7 @@ class _PistasViewState extends State<PistasView> {
     });
   }
 
-  /// Elimina las pistas seleccionadas (solo admin)
+  /** Elimina las pistas seleccionadas (solo admin) */
   Future<void> _eliminarPistasSeleccionadas() async {
     if (!_esAdmin || _pistasSeleccionadas.isEmpty) return;
 
@@ -200,7 +219,6 @@ class _PistasViewState extends State<PistasView> {
         _isLoading = true;
       });
 
-      // Asumimos que existe un método similar al de equipos para eliminar múltiples pistas
       final eliminadas = await _pistaController.eliminarPistasMultiples(
         _pistasSeleccionadas,
         userId!,
@@ -223,7 +241,7 @@ class _PistasViewState extends State<PistasView> {
     }
   }
 
-  /// Muestra diálogo de confirmación
+  /** Muestra diálogo de confirmación para acciones destructivas */
   Future<bool> _mostrarDialogoConfirmacion(
       String titulo, String mensaje) async {
     return await showDialog<bool>(
@@ -247,7 +265,7 @@ class _PistasViewState extends State<PistasView> {
         false;
   }
 
-  /// Maneja la navegación del BottomNavBar
+  /** Maneja la navegación del BottomNavBar */
   void _onNavItemTapped(int index) {
     switch (index) {
       case 0:
@@ -259,6 +277,56 @@ class _PistasViewState extends State<PistasView> {
       case 2:
         break; // Ya estamos en pistas
     }
+  }
+
+  /** Configura y muestra el tutorial interactivo */
+  void _showTutorial() {
+    targets = [
+      TargetFocus(
+        identify: "ver_mapa",
+        keyTarget: _verMapaKey,
+        contents: [
+          TargetContent(
+            child: const Text(
+              "Cambia a la vista de mapa aquí.",
+              style: TextStyle(color: Colors.white, fontSize: 20),
+            ),
+          ),
+        ],
+      ),
+      TargetFocus(
+        identify: "detalle_pista",
+        keyTarget: _detallePistaKey,
+        contents: [
+          TargetContent(
+            child: const Text(
+              "Pulsa aquí para ver los detalles de la pista.",
+              style: TextStyle(color: Colors.white, fontSize: 20),
+            ),
+          ),
+        ],
+      ),
+    ];
+
+    TutorialCoachMark(
+      targets: targets,
+      colorShadow: Colors.black,
+      textSkip: "Saltar",
+      paddingFocus: 8,
+      opacityShadow: 0.8,
+      onFinish: () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('¡Has completado la guía!')),
+        );
+        return false;
+      },
+      onSkip: () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('¡Has completado la guía!')),
+        );
+        return false;
+      },
+    ).show(context: context);
   }
 
   @override
@@ -285,25 +353,35 @@ class _PistasViewState extends State<PistasView> {
           child: Column(
             children: [
               const SizedBox(height: 16),
-              _buildHeader(), // Header con título
+              _buildHeader(), // Header con título y controles
               // Solo mostrar buscador si NO está en modo mapa o si es admin
               if (!_mostrarMapa || _esAdmin) _buildSearchBar(),
               const SizedBox(height: 16),
-              _buildActionButtons(), // Botones de acción
+              _buildActionButtons(), // Botones de acción (solo admin)
               const SizedBox(height: 16),
               _buildContent(), // Contenido principal (lista o mapa)
             ],
           ),
         ),
         bottomNavigationBar: BottomNavBar(
+          key: _navBarKey,
           currentIndex: 2,
           onTap: _onNavItemTapped,
+          isAdmin: _esAdmin,
         ),
+        // FAB solo para administradores
+        floatingActionButton: _esAdmin
+            ? FloatingActionButton(
+                key: _addPistaKey,
+                onPressed: _navegarACrearPista,
+                child: const Icon(Icons.add),
+              )
+            : null,
       ),
     );
   }
 
-  /// Construye el header con título
+  /** Construye el header con título y controles según el tipo de usuario */
   Widget _buildHeader() {
     return Padding(
       padding: const EdgeInsets.all(16.0),
@@ -328,7 +406,20 @@ class _PistasViewState extends State<PistasView> {
                 ),
             ],
           ),
-          // Mostrar controles de vista para usuarios normales, avatar para admin
+          // Mostrar botón de logout solo para admin
+          if (_esAdmin)
+            IconButton(
+              icon: const Icon(Icons.logout, color: Colors.red),
+              tooltip: 'Cerrar sesión',
+              onPressed: () async {
+                await FirebaseAuth.instance.signOut();
+                if (context.mounted) {
+                  Navigator.of(context)
+                      .pushNamedAndRemoveUntil('/login', (route) => false);
+                }
+              },
+            ),
+          // Mostrar controles de vista para usuarios normales
           if (!_esAdmin)
             StreamBuilder<DocumentSnapshot>(
               stream: FirebaseFirestore.instance
@@ -344,16 +435,11 @@ class _PistasViewState extends State<PistasView> {
                   );
                 }
 
-                String? imageUrl ;
-                if (snapshot.hasData && snapshot.data!.data() != null) {
-                  final data = snapshot.data!.data() as Map<String, dynamic>;
-                  imageUrl = data['profileImageUrl'] as String?;
-                }
-
                 return Row(
                   children: [
                     // Botones de control de vista
                     _buildActionButton(
+                      key: _verMapaKey,
                       icon: _mostrarMapa ? Icons.list : Icons.map,
                       onPressed: () {
                         setState(() {
@@ -378,7 +464,7 @@ class _PistasViewState extends State<PistasView> {
     );
   }
 
-  /// Construye la barra de búsqueda con estilo personalizado
+  /** Construye la barra de búsqueda con estilo personalizado */
   Widget _buildSearchBar() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -415,8 +501,9 @@ class _PistasViewState extends State<PistasView> {
     );
   }
 
-  /// Construye botones de acción pequeños
+  /** Construye botones de acción pequeños con estilo adaptativo */
   Widget _buildActionButton({
+    Key? key, 
     required IconData icon,
     required VoidCallback onPressed,
     required String tooltip,
@@ -424,6 +511,7 @@ class _PistasViewState extends State<PistasView> {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
+      key: key, 
       decoration: BoxDecoration(
         color: isDarkMode ? Colors.white.withAlpha(25) : Colors.grey[200],
         borderRadius: BorderRadius.circular(8),
@@ -442,7 +530,7 @@ class _PistasViewState extends State<PistasView> {
     );
   }
 
-  /// Construye los botones de acción (diferentes para usuario y admin)
+  /** Construye los botones de acción principales (solo para admin) */
   Widget _buildActionButtons() {
     if (_esAdmin) {
       // Vista de administrador: botones circulares verde (+) y rojo (-)
@@ -493,12 +581,12 @@ class _PistasViewState extends State<PistasView> {
         ),
       );
     } else {
-    // Vista de usuario normal: sin botones
-    return const SizedBox.shrink();
-  }
+      // Vista de usuario normal: sin botones
+      return const SizedBox.shrink();
+    }
   }
 
-  /// Construye el contenido principal (lista o mapa)
+  /** Construye el contenido principal (lista o mapa) */
   Widget _buildContent() {
     return Expanded(
       child: _isLoading
@@ -532,7 +620,7 @@ class _PistasViewState extends State<PistasView> {
     );
   }
 
-  /// Construye la vista de lista con pull-to-refresh
+  /** Construye la vista de lista con pull-to-refresh */
   Widget _buildLista() {
     return RefreshIndicator(
       onRefresh: _cargarPistas,
@@ -541,13 +629,16 @@ class _PistasViewState extends State<PistasView> {
         itemCount: _pistasFiltradas.length,
         itemBuilder: (context, index) {
           final pista = _pistasFiltradas[index];
-          return _buildPistaCard(pista);
+          return _buildPistaCard(
+            pista,
+            key: index == 0 ? _detallePistaKey : null, // Solo el primero para tutorial
+          );
         },
-      ),
+      )
     );
   }
 
-  /// Construye el mapa de Google Maps con marcadores
+  /** Construye el mapa de Google Maps con marcadores */
   Widget _buildMapa() {
     // Ubicación por defecto (Madrid)
     const LatLng defaultLocation = LatLng(40.416775, -3.703790);
@@ -559,7 +650,7 @@ class _PistasViewState extends State<PistasView> {
         : defaultLocation;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(20),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(15),
         child: GoogleMap(
@@ -591,11 +682,12 @@ class _PistasViewState extends State<PistasView> {
     );
   }
 
-  /// Construye una tarjeta individual de pista
-  Widget _buildPistaCard(PistaModel pista) {
+  /** Construye una tarjeta individual de pista con información completa */
+  Widget _buildPistaCard(PistaModel pista, {Key? key}) {
     final isSelected = _pistasSeleccionadas.contains(pista.id);
 
     return Container(
+      key: key, 
       margin: const EdgeInsets.only(bottom: 12),
       child: Card(
         color: Theme.of(context).scaffoldBackgroundColor,
@@ -636,7 +728,7 @@ class _PistasViewState extends State<PistasView> {
     );
   }
 
-  /// Construye la imagen de la pista con fallback
+  /** Construye la imagen de la pista con fallback */
   Widget _buildPistaImage(PistaModel pista) {
     return Container(
       width: 80,
@@ -666,7 +758,7 @@ class _PistasViewState extends State<PistasView> {
     );
   }
 
-  /// Construye la información detallada de la pista
+  /** Construye la información detallada de la pista */
   Widget _buildPistaInfo(PistaModel pista) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

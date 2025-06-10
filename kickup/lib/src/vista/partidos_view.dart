@@ -6,56 +6,70 @@ import 'package:kickup/src/controlador/partido_controller.dart';
 import 'package:kickup/src/modelo/partido_model.dart';
 import 'package:kickup/src/vista/crear_partido_view.dart';
 import 'package:kickup/src/vista/detalle_partido_view.dart';
+import 'package:kickup/src/vista/pista_view.dart';
 import '../componentes/bottom_nav_bar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
+import 'equipos_view.dart';
 
+/** Vista principal para la gestión de partidos de fútbol.
+ * Permite visualizar, buscar y crear partidos. Incluye sistema de tutorial
+ * interactivo para nuevos usuarios y navegación entre las diferentes
+ * secciones de la aplicación (partidos, equipos, pistas).
+ */
 class PartidosView extends StatefulWidget {
-  const PartidosView({
-    Key? key,
-  }) : super(key: key);
+  final bool showTutorial;
+  const PartidosView({Key? key, this.showTutorial = false}) : super(key: key);
 
   @override
   State<PartidosView> createState() => _PartidosViewState();
 }
 
 class _PartidosViewState extends State<PartidosView> {
-  // Controladores para manejar la lógica 
   final PartidoController _partidoController = PartidoController();
-  final AuthController _authController = AuthController(); 
+  final AuthController _authController = AuthController();
   final TextEditingController _searchController = TextEditingController();
-  
-  // Variables de estado principales
+
   List<PartidoModel> _partidos = [];
   bool _isLoading = true;
   int _currentIndex = 0;
   late final String? userId;
 
+  // Claves globales para el sistema de tutorial
+  final GlobalKey _fabKey = GlobalKey();
+  final GlobalKey _navBarKey = GlobalKey();
+  final GlobalKey _avatarKey = GlobalKey();
+  List<TargetFocus> targets = [];
+
   @override
   void initState() {
     super.initState();
-    // Obtener el ID del usuario actual desde Firebase Auth
     userId = FirebaseAuth.instance.currentUser?.uid;
     _cargarPartidos();
 
-    // Listener para la búsqueda en tiempo real
+    // Configurar búsqueda en tiempo real
     _searchController.addListener(() {
       final query = _searchController.text.trim();
       if (query.isEmpty) {
-        _cargarPartidos(); // Recargar todos los partidos si no hay búsqueda
+        _cargarPartidos();
       } else {
-        _buscarPartidos(query); // Buscar partidos específicos
+        _buscarPartidos(query);
       }
     });
+
+    // Mostrar tutorial si es necesario
+    if (widget.showTutorial) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _showTutorial());
+    }
   }
 
   @override
   void dispose() {
-    // Limpiar recursos para evitar memory leaks
     _searchController.dispose();
     super.dispose();
   }
 
-  /// Carga todos los partidos disponibles desde el controlador
+  /** Carga todos los partidos desde el controlador */
   Future<void> _cargarPartidos() async {
     setState(() {
       _isLoading = true;
@@ -69,9 +83,8 @@ class _PartidosViewState extends State<PartidosView> {
     });
   }
 
-  /// Busca partidos específicos basado en la query del usuario
+  /** Busca partidos basado en el texto de consulta */
   Future<void> _buscarPartidos(String query) async {
-    // Mostrar loading solo si hay partidos para mejorar UX
     if (_partidos.isNotEmpty) {
       setState(() {
         _isLoading = true;
@@ -86,7 +99,7 @@ class _PartidosViewState extends State<PartidosView> {
     });
   }
 
-  /// Formatea la fecha del partido en formato legible en español
+  /** Formatea la fecha del partido en formato legible */
   String _formatearFecha(DateTime fecha) {
     final dia = fecha.day;
     final mes = _obtenerNombreMes(fecha.month);
@@ -97,33 +110,171 @@ class _PartidosViewState extends State<PartidosView> {
     return '$dia de $mes,$anio - $hora:$minuto';
   }
 
-  /// Convierte el número del mes a su nombre en español
+  /** Obtiene el nombre del mes en español */
   String _obtenerNombreMes(int mes) {
     const meses = [
-      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+      'Enero',
+      'Febrero',
+      'Marzo',
+      'Abril',
+      'Mayo',
+      'Junio',
+      'Julio',
+      'Agosto',
+      'Septiembre',
+      'Octubre',
+      'Noviembre',
+      'Diciembre'
     ];
     return meses[mes - 1];
   }
 
-  /// Maneja la navegación entre pestañas del BottomNavBar
+  /** Maneja la navegación entre pestañas de la barra inferior */
   void _onNavBarTap(int index) {
     setState(() {
       _currentIndex = index;
     });
 
-    // Navegación usando rutas nombradas para mejor organización
-    switch (index) {
-      case 0:
-        Navigator.of(context).pushReplacementNamed('/partidos');
-        break;
-      case 1:
-        Navigator.of(context).pushReplacementNamed('/equipos');
-        break;
-      case 2:
-        Navigator.of(context).pushReplacementNamed('/pistas');
-        break;
+    if (widget.showTutorial) {
+      // Navegación durante el tutorial
+      switch (index) {
+        case 0:
+          // Ya estamos en Partidos, no hacer nada
+          break;
+        case 1:
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => EquiposView(showTutorial: true),
+            ),
+          );
+          break;
+        case 2:
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => PistasView(showTutorial: true),
+            ),
+          );
+          break;
+      }
+    } else {
+      // Navegación normal usando rutas nombradas
+      switch (index) {
+        case 0:
+          break;
+        case 1:
+          Navigator.of(context).pushReplacementNamed('/equipos');
+          break;
+        case 2:
+          Navigator.of(context).pushReplacementNamed('/pistas');
+          break;
+      }
     }
+  }
+
+  /** Configura y muestra el tutorial interactivo para nuevos usuarios */
+  void _showTutorial() {
+    targets = [
+      TargetFocus(
+        identify: "crear_partido",
+        keyTarget: _fabKey,
+        contents: [
+          TargetContent(
+            child: const Text(
+              "¡Crea un partido aquí!",
+              style: TextStyle(color: Colors.white, fontSize: 20),
+            ),
+          ),
+        ],
+      ),
+      TargetFocus(
+        identify: "avatar",
+        keyTarget: _avatarKey,
+        contents: [
+          TargetContent(
+            child: const Text(
+              "Accede a tu perfil desde aquí.",
+              style: TextStyle(color: Colors.white, fontSize: 20),
+            ),
+          ),
+        ],
+      ),
+      TargetFocus(
+        identify: "nav_bar",
+        keyTarget: _navBarKey,
+        contents: [
+          TargetContent(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  "Barra de navegación",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 22,
+                  ),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  "Navega entre Partidos, Equipos y Pistas.",
+                  style: TextStyle(color: Colors.white, fontSize: 18),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ];
+
+    TutorialCoachMark(
+      targets: targets,
+      colorShadow: Colors.black,
+      textSkip: "Saltar",
+      paddingFocus: 8,
+      opacityShadow: 0.8,
+      onFinish: () {
+        // Navegar al siguiente paso del tutorial
+        if (_partidos.isNotEmpty && userId != null) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => DetallePartidoView(
+                partidoId: _partidos.first.id,
+                userId: userId!,
+                showTutorial: true,
+              ),
+            ),
+          );
+        } else {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => EquiposView(showTutorial: true),
+            ),
+          );
+        }
+        return false;
+      },
+      onSkip: () {
+        // Mismo comportamiento al saltar el tutorial
+        if (_partidos.isNotEmpty && userId != null) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => DetallePartidoView(
+                partidoId: _partidos.first.id,
+                userId: userId!,
+                showTutorial: true,
+              ),
+            ),
+          );
+        } else {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => EquiposView(showTutorial: true),
+            ),
+          );
+        }
+        return false;
+      },
+    ).show(context: context);
   }
 
   @override
@@ -131,7 +282,6 @@ class _PartidosViewState extends State<PartidosView> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Container(
-        // Margen personalizado para crear el efecto de tarjeta
         margin: const EdgeInsets.fromLTRB(16, 60, 16, 16),
         decoration: BoxDecoration(
           color: AppColors.fieldBackground(context),
@@ -154,14 +304,13 @@ class _PartidosViewState extends State<PartidosView> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  // StreamBuilder para mostrar la imagen de perfil en tiempo real
+                  // Avatar del usuario con datos en tiempo real
                   StreamBuilder<DocumentSnapshot>(
                     stream: FirebaseFirestore.instance
                         .collection('usuarios')
                         .doc(userId)
                         .snapshots(),
                     builder: (context, snapshot) {
-                      // Mostrar loading mientras se carga la imagen
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const CircleAvatar(
                           radius: 20,
@@ -169,25 +318,26 @@ class _PartidosViewState extends State<PartidosView> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         );
                       }
-                      
-                      // Extraer URL de la imagen del documento de Firestore
+
                       String? imageUrl;
                       if (snapshot.hasData && snapshot.data!.data() != null) {
-                        final data = snapshot.data!.data() as Map<String, dynamic>;
+                        final data =
+                            snapshot.data!.data() as Map<String, dynamic>;
                         imageUrl = data['profileImageUrl'] as String?;
                       }
-                      
+
                       return GestureDetector(
+                        key: _avatarKey,
                         onTap: () {
                           _authController.navigateToPerfil(context);
                         },
                         child: CircleAvatar(
                           radius: 20,
                           backgroundColor: Colors.grey[300],
-                          // Mostrar imagen de red si existe, sino mostrar icono por defecto
-                          backgroundImage: (imageUrl != null && imageUrl.isNotEmpty)
-                              ? NetworkImage(imageUrl)
-                              : null,
+                          backgroundImage:
+                              (imageUrl != null && imageUrl.isNotEmpty)
+                                  ? NetworkImage(imageUrl)
+                                  : null,
                           child: (imageUrl == null || imageUrl.isEmpty)
                               ? const Icon(Icons.person, color: Colors.white)
                               : null,
@@ -204,7 +354,6 @@ class _PartidosViewState extends State<PartidosView> {
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Row(
                 children: [
-                  // Campo de búsqueda expandible
                   Expanded(
                     child: Container(
                       height: 50,
@@ -224,14 +373,19 @@ class _PartidosViewState extends State<PartidosView> {
                         decoration: InputDecoration(
                           hintText: 'Buscar',
                           hintStyle: TextStyle(
-                            color: Theme.of(context).inputDecorationTheme.hintStyle?.color,
+                            color: Theme.of(context)
+                                .inputDecorationTheme
+                                .hintStyle
+                                ?.color,
                           ),
-                          prefixIcon: Icon(Icons.search, color: Theme.of(context).iconTheme.color),
+                          prefixIcon: Icon(Icons.search,
+                              color: Theme.of(context).iconTheme.color),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(20),
                             borderSide: BorderSide.none,
                           ),
-                          contentPadding: const EdgeInsets.symmetric(vertical: 15),
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 15),
                           filled: true,
                           fillColor: AppColors.background(context),
                         ),
@@ -239,17 +393,18 @@ class _PartidosViewState extends State<PartidosView> {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  // Botón para crear nuevo partido
+                  // Botón crear partido
                   ElevatedButton.icon(
+                    key: _fabKey,
                     onPressed: () async {
-                      // Navegar a la pantalla de crear partido y esperar resultado
-                      final partidoCreado = await Navigator.of(context).push<bool>(
+                      final partidoCreado =
+                          await Navigator.of(context).push<bool>(
                         MaterialPageRoute(
-                          builder: (context) => CrearPartidoView(userId: userId!),
+                          builder: (context) =>
+                              CrearPartidoView(userId: userId!),
                         ),
                       );
 
-                      // Recargar lista si se creó un partido exitosamente
                       if (partidoCreado == true) {
                         _cargarPartidos();
                       }
@@ -282,7 +437,6 @@ class _PartidosViewState extends State<PartidosView> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              // Icono y mensaje para estado vacío
                               Icon(
                                 Icons.sports_soccer,
                                 size: 64,
@@ -290,7 +444,6 @@ class _PartidosViewState extends State<PartidosView> {
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                // Mensaje diferente según si hay búsqueda activa o no
                                 _searchController.text.trim().isEmpty
                                     ? 'No hay partidos disponibles'
                                     : 'No se encontraron partidos',
@@ -314,8 +467,8 @@ class _PartidosViewState extends State<PartidosView> {
                               completo: partido.completo,
                               faltantes: partido.jugadoresFaltantes,
                               onTap: () async {
-                                // Navegar al detalle y recargar si hubo cambios
-                                final actualizado = await Navigator.of(context).push<bool>(
+                                final actualizado =
+                                    await Navigator.of(context).push<bool>(
                                   MaterialPageRoute(
                                     builder: (context) => DetallePartidoView(
                                       partidoId: partido.id,
@@ -325,7 +478,7 @@ class _PartidosViewState extends State<PartidosView> {
                                 );
 
                                 if (actualizado == true) {
-                                  _cargarPartidos(); 
+                                  _cargarPartidos();
                                 }
                               },
                             );
@@ -336,14 +489,19 @@ class _PartidosViewState extends State<PartidosView> {
         ),
       ),
       bottomNavigationBar: BottomNavBar(
+        key: _navBarKey,
         currentIndex: _currentIndex,
         onTap: _onNavBarTap,
+        isAdmin: false,
       ),
     );
   }
 }
 
-/// Widget personalizado para mostrar cada tarjeta de partido
+/** Widget personalizado para mostrar información de cada partido.
+ * Incluye fecha, tipo, ubicación y estado de disponibilidad
+ * con diseño adaptativo según el tema de la aplicación.
+ */
 class _PartidoCard extends StatelessWidget {
   final String fecha;
   final String tipo;
@@ -376,7 +534,6 @@ class _PartidoCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Fecha con icono
             Row(
               children: [
                 const Icon(
@@ -396,7 +553,6 @@ class _PartidoCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            // Tipo y lugar del partido
             Text(
               '$tipo $lugar',
               style: const TextStyle(
@@ -405,7 +561,6 @@ class _PartidoCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            // Estado del partido (completo o jugadores faltantes)
             Text(
               completo ? 'Completo' : 'Faltan $faltantes',
               style: TextStyle(

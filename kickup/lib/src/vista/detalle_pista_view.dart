@@ -4,8 +4,16 @@ import 'package:kickup/src/componentes/app_styles.dart';
 import '../controlador/pista_controller.dart';
 import '../modelo/pista_model.dart';
 
+/** Vista detallada de una pista deportiva.
+ * Muestra información completa de la pista, incluyendo imagen,
+ * disponibilidad, precio, ubicación en mapa y permite realizar
+ * reservas cuando está disponible.
+ */
 class DetallePistaView extends StatefulWidget {
+  /** ID de la pista a mostrar */
   final String pistaId;
+  
+  /** ID del usuario actual */
   final String userId;
 
   const DetallePistaView({
@@ -40,12 +48,14 @@ class _DetallePistaViewState extends State<DetallePistaView> {
 
   @override
   void dispose() {
-    // Limpiar controlador del mapa para evitar memory leaks
     _mapController?.dispose();
     super.dispose();
   }
 
-  /// Carga la información de la pista y configura el marcador del mapa
+  /** Carga la información de la pista y configura el marcador del mapa.
+   * Obtiene los datos de la pista desde el controlador y crea
+   * un marcador para mostrar en el mapa de Google Maps.
+   */
   Future<void> _cargarPista() async {
     setState(() {
       _isLoading = true;
@@ -103,7 +113,10 @@ class _DetallePistaViewState extends State<DetallePistaView> {
     }
   }
 
-  /// Maneja la funcionalidad de reserva de pista
+  /** Maneja la funcionalidad de reserva de pista.
+   * Actualmente es un placeholder que muestra un mensaje
+   * indicando que la funcionalidad estará disponible próximamente.
+   */
   Future<void> _reservarPista() async {
     if (_procesandoReserva || !_pista!.disponible) return;
 
@@ -112,7 +125,6 @@ class _DetallePistaViewState extends State<DetallePistaView> {
     });
 
     try {
-      // Simular proceso de reserva (implementar lógica real aquí)
       await Future.delayed(const Duration(seconds: 2));
 
       if (mounted) {
@@ -153,7 +165,7 @@ class _DetallePistaViewState extends State<DetallePistaView> {
     );
   }
 
-  /// Construye el AppBar personalizado
+  /** Construye el AppBar personalizado */
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
@@ -172,7 +184,7 @@ class _DetallePistaViewState extends State<DetallePistaView> {
     );
   }
 
-  /// Construye el estado de error cuando no se encuentra la pista
+  /** Construye el estado de error cuando no se encuentra la pista */
   Widget _buildErrorState() {
     return Center(
       child: Column(
@@ -198,7 +210,7 @@ class _DetallePistaViewState extends State<DetallePistaView> {
     );
   }
 
-  /// Construye el contenido principal de la pista
+  /** Construye el contenido principal de la pista */
   Widget _buildPistaContent() {
     return SingleChildScrollView(
       child: Column(
@@ -214,7 +226,7 @@ class _DetallePistaViewState extends State<DetallePistaView> {
     );
   }
 
-  /// Construye la sección de imagen de la pista
+  /** Construye la sección de imagen de la pista con indicador de disponibilidad */
   Widget _buildImageSection() {
     return Container(
       height: 250,
@@ -222,7 +234,7 @@ class _DetallePistaViewState extends State<DetallePistaView> {
         color: Colors.grey[300],
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha(25), // Sombra sutil
+            color: Colors.black.withAlpha(25), 
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -242,7 +254,6 @@ class _DetallePistaViewState extends State<DetallePistaView> {
                           : NetworkImage(_pista!.imagenUrl!),
                       fit: BoxFit.cover,
                       onError: (exception, stackTrace) {
-                        // Manejar error de carga de imagen
                       },
                     )
                   : null,
@@ -265,7 +276,7 @@ class _DetallePistaViewState extends State<DetallePistaView> {
                 end: Alignment.bottomCenter,
                 colors: [
                   Colors.transparent,
-                  Colors.black.withAlpha(76), // Gradiente sutil
+                  Colors.black.withAlpha(76), 
                 ],
               ),
             ),
@@ -281,7 +292,7 @@ class _DetallePistaViewState extends State<DetallePistaView> {
     );
   }
 
-  /// Construye el badge de disponibilidad
+  /** Construye el badge de disponibilidad con color según estado */
   Widget _buildAvailabilityBadge() {
     final isAvailable = _pista!.disponible;
 
@@ -320,7 +331,7 @@ class _DetallePistaViewState extends State<DetallePistaView> {
     );
   }
 
-  /// Construye la sección de información de la pista
+  /** Construye la sección de información detallada de la pista */
   Widget _buildInfoSection() {
     return Container(
       margin: const EdgeInsets.all(16),
@@ -390,7 +401,12 @@ class _DetallePistaViewState extends State<DetallePistaView> {
     );
   }
 
-  /// Construye una fila de información con icono
+  /** Construye una fila de información con icono y etiqueta.
+   * @param icon Icono a mostrar
+   * @param label Etiqueta descriptiva
+   * @param value Valor a mostrar
+   * @param valueColor Color opcional para el valor
+   */
   Widget _buildInfoRow(IconData icon, String label, String value,
       {Color? valueColor}) {
     return Row(
@@ -427,7 +443,7 @@ class _DetallePistaViewState extends State<DetallePistaView> {
     );
   }
 
-  /// Construye la sección del mapa
+  /** Construye la sección del mapa con Google Maps */
   Widget _buildMapSection() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -482,7 +498,7 @@ class _DetallePistaViewState extends State<DetallePistaView> {
                   // Overlay de carga del mapa
                   if (!_mapLoaded)
                     Container(
-                      color: Colors.white.withAlpha(178), // Semi-transparente
+                      color: Colors.white.withAlpha(178), 
                       child: const Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -521,7 +537,7 @@ class _DetallePistaViewState extends State<DetallePistaView> {
     );
   }
 
-  /// Construye el botón de reserva
+  /** Construye el botón de reserva con estado según disponibilidad */
   Widget _buildReserveButton() {
     return Container(
       margin: const EdgeInsets.all(16),
