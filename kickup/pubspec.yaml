@@ -1,0 +1,70 @@
+name: kickup
+description: Una nueva aplicación Flutter.
+publish_to: 'none'
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  provider: ^6.1.5
+
+  # Tutorial
+  tutorial_coach_mark: ^1.2.6
+
+  # Firebase
+  firebase_core: ^3.13.1
+  firebase_auth: ^5.5.4
+  firebase_analytics: ^11.4.6
+  cloud_firestore: ^5.6.8
+  firebase_storage: ^12.4.6
+  firebase_messaging: ^15.2.6
+
+  #Utilidades
+  shared_preferences: ^2.0.15
+  intl: ^0.20.2
+  
+  # Mapa
+  google_maps_flutter: ^2.5.0
+  geolocator: ^14.0.1
+  geocoding: ^4.0.0
+  uuid: ^4.5.1
+  location: ^8.0.0
+  
+  #Permisos
+  permission_handler: ^12.0.0+1
+
+  # Imágenes
+  image_picker: ^1.0.4
+  cached_network_image: ^3.3.0
+
+  # UI
+  cupertino_icons: ^1.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_launcher_icons: ^0.14.3
+
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/Icono.png"
+  adaptive_icon_background: "assets/icon_background.png" 
+  adaptive_icon_foreground: "assets/icon_foreground.png"  
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/logo.png
+    - assets/arbitro.png
+    - assets/profile.jpg
+    - assets/pistas/campo1.jpg
+    - assets/pistas/campo2.jpg 
+    - assets/pistas/campo3.jpg
+    - assets/pistas/campo4.jpg
+    - assets/pistas/campo5.jpg
+    - assets/pistas/campo6.jpg
+    - assets/pistas/campo7.jpg
+    - assets/pistas/campo8.jpg
