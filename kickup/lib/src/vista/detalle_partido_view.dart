@@ -6,6 +6,7 @@ import 'package:kickup/src/servicio/user_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:kickup/src/vista/equipos_view.dart';
 import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
+import 'package:kickup/src/vista/sanciones_view.dart';
 
 /** Vista detallada de un partido deportivo.
  * Muestra información completa del partido, lista de jugadores inscritos,
@@ -138,6 +139,95 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
         );
       }
     }
+  }
+
+  /** Verifica si el usuario actual es el creador del partido */
+  bool _esCreadorDelPartido() {
+    // Aquí deberías verificar si el usuario actual creó el partido
+    // Por ahora, asumiremos que el primer jugador de la lista es el creador
+    if (_partido?.jugadores.isNotEmpty == true) {
+      return _partido!.jugadores.first.id == widget.userId;
+    }
+    return false;
+  }
+
+  /** Elimina el partido con confirmación del usuario */
+  Future<void> _eliminarPartido() async {
+    // Mostrar diálogo de confirmación
+    final confirmar = await _mostrarDialogoConfirmacionEliminar();
+    if (confirmar != true) return;
+
+    setState(() {
+      _procesandoSolicitud = true;
+    });
+
+    try {
+      final success = await _partidoController.eliminarPartido(widget.partidoId);
+
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Partido eliminado correctamente'),
+            backgroundColor: Colors.green,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+
+        // Volver a la pantalla anterior
+        Navigator.pop(context, true);
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error al eliminar el partido'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _procesandoSolicitud = false;
+        });
+      }
+    }
+  }
+
+  /** Muestra un diálogo de confirmación para eliminar el partido */
+  Future<bool?> _mostrarDialogoConfirmacionEliminar() {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar partido'),
+        content: const Text(
+          '¿Estás seguro de que quieres eliminar este partido?\n\n'
+          'Esta acción no se puede deshacer y todos los jugadores inscritos serán notificados.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
   }
 
   /** Procesa la inscripción del usuario al partido.
@@ -360,7 +450,7 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
     );
   }
 
-  /** Construye el AppBar personalizado */
+  /** Construye el AppBar personalizado con opción de eliminar para el creador */
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
@@ -376,6 +466,36 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
           fontWeight: FontWeight.bold,
         ),
       ),
+      actions: [
+        // Mostrar botón de eliminar solo si es el creador del partido
+        if (_esCreadorDelPartido())
+          PopupMenuButton<String>(
+            icon: Icon(
+              Icons.more_vert,
+              color: Theme.of(context).iconTheme.color,
+            ),
+            onSelected: (value) {
+              if (value == 'eliminar') {
+                _eliminarPartido();
+              }
+            },
+            itemBuilder: (BuildContext context) => [
+              const PopupMenuItem<String>(
+                value: 'eliminar',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete, color: Colors.red),
+                    SizedBox(width: 8),
+                    Text(
+                      'Eliminar partido',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+      ],
     );
   }
 
@@ -427,6 +547,8 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
             _buildHeader(), // Encabezado con fecha y tipo
             _buildPartidoInfo(), // Información del partido
             _buildPlayersSection(), // Lista de jugadores
+            // Botón de gestionar asistencia (solo para el creador)
+            if (_esCreadorDelPartido()) _buildGestionarAsistenciaButton(),
             _buildActionButton(), // Botón de acción
             const SizedBox(height: 16),
           ],
@@ -562,6 +684,49 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
           const SizedBox(height: 16),
           _buildPlayersList(),
         ],
+      ),
+    );
+  }
+
+  /** Construye el botón para gestionar asistencia (solo visible para el creador) */
+  Widget _buildGestionarAsistenciaButton() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: () async {
+            final resultado = await Navigator.of(context).push<bool>(
+              MaterialPageRoute(
+                builder: (context) => SancionesView(
+                  partidoId: widget.partidoId,
+                  creadorId: widget.userId,
+                ),
+              ),
+            );
+            
+            if (resultado == true) {
+              // Recargar datos si se guardaron cambios
+              _cargarPartido();
+            }
+          },
+          icon: const Icon(Icons.checklist, size: 20),
+          label: const Text(
+            'Gestionar Asistencia',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.purple,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 13),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(30),
+            ),
+          ),
+        ),
       ),
     );
   }

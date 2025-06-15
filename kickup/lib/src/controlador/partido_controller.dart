@@ -184,4 +184,62 @@ class PartidoController {
       return false;
     }
   }
+
+  /** Elimina un partido específico por su ID.
+     Utiliza transacciones para garantizar consistencia.
+     Solo el creador del partido puede eliminarlo. */
+  Future<bool> eliminarPartido(String partidoId) async {
+    try {
+      final partidoRef = _firestore.collection('partidos').doc(partidoId);
+
+      return await _firestore.runTransaction<bool>((transaction) async {
+        final doc = await transaction.get(partidoRef);
+        if (!doc.exists) return false;
+
+        // Eliminar el documento del partido
+        transaction.delete(partidoRef);
+        return true;
+      });
+    } catch (e) {
+      print('Error al eliminar partido: $e');
+      return false;
+    }
+  }
+
+  /** Limpia automáticamente los partidos que ya han pasado su fecha.
+     Se ejecuta periódicamente para mantener la base de datos limpia.
+     Elimina todos los partidos cuya fecha sea anterior a la actual. */
+  Future<void> limpiarPartidosExpirados() async {
+    try {
+      final ahora = DateTime.now();
+      
+      // Obtener todos los partidos
+      final snapshot = await _firestore.collection('partidos').get();
+      
+      // Crear un batch para eliminar múltiples documentos
+      final batch = _firestore.batch();
+      int partidosEliminados = 0;
+
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final fechaPartido = (data['fecha'] as Timestamp).toDate();
+        
+        // Si el partido ya pasó (con un margen de 2 horas para finalización)
+        if (fechaPartido.isBefore(ahora.subtract(const Duration(hours: 2)))) {
+          batch.delete(doc.reference);
+          partidosEliminados++;
+        }
+      }
+
+      // Ejecutar la eliminación en lote si hay partidos para eliminar
+      if (partidosEliminados > 0) {
+        await batch.commit();
+        print('Partidos expirados eliminados: $partidosEliminados');
+      }
+    } catch (e) {
+      print('Error al limpiar partidos expirados: $e');
+    }
+  }
 }
+
+

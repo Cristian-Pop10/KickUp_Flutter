@@ -44,7 +44,6 @@ class _PistasViewState extends State<PistasView> {
 
   // Claves globales para el sistema de tutorial
   final GlobalKey _navBarKey = GlobalKey();
-  final GlobalKey _addPistaKey = GlobalKey();
   final GlobalKey _verMapaKey = GlobalKey();
   final GlobalKey _detallePistaKey = GlobalKey();
   List<TargetFocus> targets = [];
@@ -161,6 +160,7 @@ class _PistasViewState extends State<PistasView> {
         builder: (context) => DetallePistaView(
           pistaId: pistaId,
           userId: userId!,
+          esAdmin: _esAdmin,
         ),
       ),
     );
@@ -368,14 +368,7 @@ class _PistasViewState extends State<PistasView> {
           onTap: _onNavItemTapped,
           isAdmin: _esAdmin,
         ),
-        // FAB solo para administradores
-        floatingActionButton: _esAdmin
-            ? FloatingActionButton(
-                key: _addPistaKey,
-                onPressed: _navegarACrearPista,
-                child: const Icon(Icons.add),
-              )
-            : null,
+        // FloatingActionButton eliminado para evitar duplicación
       ),
     );
   }

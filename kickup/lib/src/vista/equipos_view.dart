@@ -358,11 +358,14 @@ class _EquiposViewState extends State<EquiposView> {
           },
           isAdmin: _esAdmin,
         ),
-        floatingActionButton: FloatingActionButton(
-          key: _addTeamKey,
-          onPressed: _navegarACrearEquipo,
-          child: const Icon(Icons.add),
-        ),
+        // FloatingActionButton solo para usuarios normales (no admin)
+        floatingActionButton: !_esAdmin
+            ? FloatingActionButton(
+                key: _addTeamKey,
+                onPressed: _navegarACrearEquipo,
+                child: const Icon(Icons.add),
+              )
+            : null, // No mostrar FAB para administradores
       ),
     );
   }

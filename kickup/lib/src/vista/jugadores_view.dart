@@ -338,6 +338,68 @@ class _JugadoresViewState extends State<JugadoresView> {
     }
   }
 
+  /** Elimina un usuario y lo quita de todos los equipos donde esté */
+  Future<void> _eliminarUsuario(String jugadorId) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar usuario'),
+        content: const Text('¿Estás seguro de que deseas eliminar este usuario? Esta acción no se puede deshacer.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        // Elimina el usuario de la colección usuarios
+        await FirebaseFirestore.instance.collection('usuarios').doc(jugadorId).delete();
+
+        // Elimina al usuario de todos los equipos donde esté
+        final equiposSnapshot = await FirebaseFirestore.instance
+            .collection('equipos')
+            .where('jugadoresIds', arrayContains: jugadorId)
+            .get();
+
+        for (final equipoDoc in equiposSnapshot.docs) {
+          final data = equipoDoc.data();
+          final jugadoresIds = List<String>.from(data['jugadoresIds'] ?? []);
+          final jugadores = List<Map<String, dynamic>>.from(data['jugadores'] ?? []);
+
+          jugadoresIds.remove(jugadorId);
+          final jugadoresActualizados = jugadores.where((j) => j['id'] != jugadorId).toList();
+
+          await equipoDoc.reference.update({
+            'jugadoresIds': jugadoresIds,
+            'jugadores': jugadoresActualizados,
+          });
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Usuario eliminado correctamente'), backgroundColor: Colors.green),
+          );
+          _cargarJugadores();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error al eliminar usuario: $e'), backgroundColor: Colors.red),
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -562,6 +624,7 @@ class _JugadoresViewState extends State<JugadoresView> {
                             ? _toggleSeleccionJugador(jugador['id'])
                             : _mostrarDialogoSanciones(jugador),
                         onLongPress: () => _toggleModoSeleccion(),
+                        onDelete: () => _eliminarUsuario(jugador['id']),
                       );
                     },
                   ),
@@ -580,6 +643,7 @@ class _JugadorCard extends StatelessWidget {
   final bool seleccionado;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
+  final VoidCallback? onDelete;
 
   const _JugadorCard({
     Key? key,
@@ -588,6 +652,7 @@ class _JugadorCard extends StatelessWidget {
     required this.seleccionado,
     required this.onTap,
     required this.onLongPress,
+    required this.onDelete,
   }) : super(key: key);
 
   @override
@@ -661,6 +726,13 @@ class _JugadorCard extends StatelessWidget {
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
+                            ),
+                          // Icono eliminar (solo si no es el admin actual)
+                          if (!isAdmin && jugador['id'] != FirebaseAuth.instance.currentUser?.uid && onDelete != null)
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              tooltip: 'Eliminar usuario',
+                              onPressed: onDelete,
                             ),
                         ],
                       ),

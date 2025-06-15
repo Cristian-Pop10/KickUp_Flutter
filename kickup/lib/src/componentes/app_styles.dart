@@ -6,8 +6,12 @@ class AppColors {
   static Color background(BuildContext context) =>
       Theme.of(context).scaffoldBackgroundColor;
 
-  static Color cardBackground(BuildContext context) =>
-      Theme.of(context).cardColor;
+  static Color cardBackground(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    return brightness == Brightness.dark
+        ? const Color(0xFF35363A) // Un gris claro para destacar en oscuro
+        : Theme.of(context).cardColor;
+  }
 
   static Color fieldBackground(BuildContext context) {
     final brightness = Theme.of(context).brightness;
@@ -15,7 +19,6 @@ class AppColors {
         ? const Color(0xFF2C2C2E)
         : const Color.fromARGB(255, 225, 225, 202); // beige claro
   }
-
 
   static Color textPrimary(BuildContext context) =>
       Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black;
@@ -34,7 +37,7 @@ class AppColors {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return isDark
-        ? const Color.fromARGB(255, 183, 176, 151)
+        ? const Color.fromARGB(255, 240, 152, 36)
         : const Color.fromARGB(255, 218, 203, 134);
   }
 }

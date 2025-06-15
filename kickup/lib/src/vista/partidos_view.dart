@@ -11,6 +11,7 @@ import '../componentes/bottom_nav_bar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 import 'equipos_view.dart';
+import 'dart:async';
 
 /** Vista principal para la gestión de partidos de fútbol.
  * Permite visualizar, buscar y crear partidos. Incluye sistema de tutorial
@@ -35,6 +36,9 @@ class _PartidosViewState extends State<PartidosView> {
   int _currentIndex = 0;
   late final String? userId;
 
+  // Timer para limpiar partidos expirados
+  Timer? _cleanupTimer;
+
   // Claves globales para el sistema de tutorial
   final GlobalKey _fabKey = GlobalKey();
   final GlobalKey _navBarKey = GlobalKey();
@@ -57,6 +61,11 @@ class _PartidosViewState extends State<PartidosView> {
       }
     });
 
+    // Configurar timer para limpiar partidos expirados cada 30 minutos
+    _cleanupTimer = Timer.periodic(const Duration(minutes: 30), (timer) {
+      _limpiarPartidosExpirados();
+    });
+
     // Mostrar tutorial si es necesario
     if (widget.showTutorial) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _showTutorial());
@@ -66,7 +75,21 @@ class _PartidosViewState extends State<PartidosView> {
   @override
   void dispose() {
     _searchController.dispose();
+    _cleanupTimer?.cancel();
     super.dispose();
+  }
+
+  /** Limpia automáticamente los partidos que ya han pasado su fecha */
+  Future<void> _limpiarPartidosExpirados() async {
+    try {
+      await _partidoController.limpiarPartidosExpirados();
+      // Recargar la lista después de la limpieza
+      if (mounted) {
+        _cargarPartidos();
+      }
+    } catch (e) {
+      print('Error al limpiar partidos expirados: $e');
+    }
   }
 
   /** Carga todos los partidos desde el controlador */
@@ -128,6 +151,7 @@ class _PartidosViewState extends State<PartidosView> {
     ];
     return meses[mes - 1];
   }
+
 
   /** Maneja la navegación entre pestañas de la barra inferior */
   void _onNavBarTap(int index) {
