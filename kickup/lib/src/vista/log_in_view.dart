@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:kickup/src/vista/partidos_view.dart';
+import 'package:kickup/src/vista/jugadores_view.dart';
 import 'package:kickup/src/vista/sign_up_view.dart';
 import '../preferences/pref_usuarios.dart';
 
@@ -12,7 +13,7 @@ import '../preferences/pref_usuarios.dart';
  */
 class LogInPage extends StatefulWidget {
   static const String routeName = '/login';
-  
+
   const LogInPage({super.key});
 
   @override
@@ -25,8 +26,9 @@ class _LogInPageState extends State<LogInPage> {
   bool _isLoading = false;
 
   /** Maneja el proceso de inicio de sesión con Firebase Auth.
+   * CAMBIO PRINCIPAL: Ahora verifica si el usuario es admin antes de navegar.
    * Incluye validación de credenciales, creación automática de documento
-   * en Firestore si no existe, y navegación a la vista principal.
+   * en Firestore si no existe, y navegación a la vista correcta según el tipo de usuario.
    */
   Future<void> _handleLogin() async {
     setState(() {
@@ -43,20 +45,20 @@ class _LogInPageState extends State<LogInPage> {
         email: email,
         password: password,
       );
-      
+
       if (userCredential.user != null) {
         final userId = userCredential.user!.uid;
-        
+
         // Guardar información del usuario en preferencias
         PreferenciasUsuario.userEmail = email;
         PreferenciasUsuario.ultimaPagina = '/partidos';
-        
-        
+
         // Verificar si el usuario existe en Firestore
         try {
           final firestore = FirebaseFirestore.instance;
-          final userDoc = await firestore.collection('usuarios').doc(userId).get();
-          
+          final userDoc =
+              await firestore.collection('usuarios').doc(userId).get();
+
           if (!userDoc.exists) {
             // Si el usuario no existe en Firestore, crearlo con datos básicos
             await firestore.collection('usuarios').doc(userId).set({
@@ -64,19 +66,19 @@ class _LogInPageState extends State<LogInPage> {
               'id': userId,
             });
           }
+
+          // CAMBIO PRINCIPAL: Verificar si es admin antes de navegar
+          await _navigateBasedOnUserType(userId);
         } catch (firestoreError) {
-          print('⚠️ Error al verificar/crear usuario en Firestore: $firestoreError');
-          // Continuar con la navegación aunque haya error en Firestore
-        }
-        
-        if (mounted) {
-          // Navegar a la pantalla de partidos
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => PartidosView(),
-            ),
-          );
+          // En caso de error, ir a partidos por defecto
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const PartidosView(),
+              ),
+            );
+          }
         }
       } else {
         if (mounted) {
@@ -87,9 +89,9 @@ class _LogInPageState extends State<LogInPage> {
       }
     } catch (e) {
       print('Error en el inicio de sesión: $e');
-      
+
       String errorMessage = 'Error al iniciar sesión';
-      
+
       // Mapeo de errores específicos de Firebase Auth
       if (e.toString().contains('user-not-found')) {
         errorMessage = 'Usuario no encontrado';
@@ -104,7 +106,7 @@ class _LogInPageState extends State<LogInPage> {
       } else if (e.toString().contains('network-request-failed')) {
         errorMessage = 'Error de conexión. Verifica tu conexión a internet';
       }
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(errorMessage)),
@@ -115,6 +117,64 @@ class _LogInPageState extends State<LogInPage> {
         setState(() {
           _isLoading = false;
         });
+      }
+    }
+  }
+
+  /** Navega a la pantalla correcta según el tipo de usuario.
+   * Verifica en Firestore si el usuario es admin y navega en consecuencia.
+   */
+  Future<void> _navigateBasedOnUserType(String userId) async {
+    try {
+      // Consultar Firestore para verificar si es admin
+      final doc = await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(userId)
+          .get();
+
+      if (!doc.exists) {
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const PartidosView(),
+            ),
+          );
+        }
+        return;
+      }
+
+      final userData = doc.data() as Map<String, dynamic>;
+      final isAdmin =
+          userData['isAdmin'] == true || userData['esAdmin'] == true;
+
+      if (mounted) {
+        if (isAdmin) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const JugadoresView(),
+            ),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const PartidosView(),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('❌ Error verificando tipo de usuario en login: $e');
+      if (mounted) {
+        // En caso de error, ir a partidos por defecto
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const PartidosView(),
+          ),
+        );
       }
     }
   }
@@ -247,7 +307,8 @@ class _InputSection extends StatelessWidget {
             child: ElevatedButton(
               onPressed: isLoading ? null : onLoginPressed,
               style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
                 backgroundColor: const Color.fromARGB(255, 129, 226, 134),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
