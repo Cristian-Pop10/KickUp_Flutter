@@ -28,7 +28,6 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // Inicializar Firebase para poder procesar el mensaje
   await Firebase.initializeApp();
-  print('Mensaje recibido en background: ${message.messageId}');
 }
 
 /** Punto de entrada principal de la aplicación KickUp.
@@ -62,12 +61,20 @@ void main() async {
   // Comprobar si es admin antes de arrancar la app
   bool esAdmin = false;
   if (isAuthenticated) {
-    final doc = await FirebaseFirestore.instance
-        .collection('usuarios')
-        .doc(userId)
-        .get();
-    final data = doc.data();
-    esAdmin = data?['esAdmin'] == true;
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(userId)
+          .get();
+      
+      if (doc.exists) {
+        final data = doc.data();
+        // Verificar tanto 'isAdmin' como 'esAdmin' para compatibilidad
+        esAdmin = data?['isAdmin'] == true || data?['esAdmin'] == true;
+      }
+    } catch (e) {
+      print('Error verificando admin: $e');
+    }
   }
 
   // Iniciar la aplicación con el proveedor de tema
@@ -110,6 +117,8 @@ class _KickUpAppState extends State<KickUpApp> {
   @override
   void initState() {
     super.initState();
+    // Debug: Imprimir el estado de admin al inicializar
+    print('KickUpApp iniciado - esAdmin: ${widget.esAdmin}');
     // Inicializar Firebase Messaging cuando se crea el widget
     _initFirebaseMessaging();
   }
@@ -126,7 +135,6 @@ class _KickUpAppState extends State<KickUpApp> {
     );
 
     if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-      print('Permisos de notificación concedidos');
 
       // Obtener token FCM para identificar este dispositivo
       String? token = await messaging.getToken();
@@ -140,8 +148,7 @@ class _KickUpAppState extends State<KickUpApp> {
 
       // Configurar listener para mensajes en primer plano
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-        print(
-            'Mensaje recibido en primer plano: ${message.notification?.title}');
+
       });
     } else {
       print('Permisos de notificación denegados');
@@ -153,6 +160,11 @@ class _KickUpAppState extends State<KickUpApp> {
     // Obtener el proveedor de tema para determinar el modo actual
     final themeProvider = Provider.of<ThemeProvider>(context);
 
+    // Debug: Imprimir la ruta inicial
+    final initialRoute = widget.isAuthenticated
+        ? (widget.esAdmin ? '/jugadores' : '/partidos')
+        : '/login';
+
     return MaterialApp(
       title: 'KickUp',
       debugShowCheckedModeBanner: false, // Ocultar banner de debug
@@ -160,13 +172,12 @@ class _KickUpAppState extends State<KickUpApp> {
       darkTheme: _darkTheme(), // Tema oscuro
       themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
 
-      // Ruta inicial basada en el estado de autenticación
-      initialRoute: widget.isAuthenticated
-          ? (widget.esAdmin ? '/jugadores' : '/partidos')
-          : '/login',
+      // Ruta inicial basada en el estado de autenticación y tipo de usuario
+      initialRoute: initialRoute,
 
       // Generador de rutas dinámico para manejar parámetros en URLs
       onGenerateRoute: (settings) {
+        
         // Extraer argumentos y usar ID de usuario si está disponible
         final args = settings.arguments;
         final userIdToUse = args is String ? args : widget.userId;
@@ -176,7 +187,7 @@ class _KickUpAppState extends State<KickUpApp> {
           case '/login':
             return MaterialPageRoute(builder: (_) => LogInPage());
           case '/partidos':
-            // Comprobar si el usuario es admin y mostrar la pantalla correspondiente
+            // Verificar si el usuario actual es admin y redirigir si es necesario
             return MaterialPageRoute(
               builder: (_) => FutureBuilder<DocumentSnapshot>(
                 future: FirebaseFirestore.instance
@@ -190,7 +201,9 @@ class _KickUpAppState extends State<KickUpApp> {
                     );
                   }
                   final data = snapshot.data!.data() as Map<String, dynamic>?;
-                  final esAdmin = data?['esAdmin'] == true;
+                  final esAdmin = data?['isAdmin'] == true || data?['esAdmin'] == true;
+                                    
+                  // Si es admin, mostrar vista de jugadores; si no, vista de partidos
                   if (esAdmin) {
                     return const JugadoresView(); 
                   } else {
@@ -206,9 +219,7 @@ class _KickUpAppState extends State<KickUpApp> {
           case '/perfil':
             return MaterialPageRoute(builder: (_) => PerfilView());
           case '/jugadores':
-            return MaterialPageRoute(
-              builder: (_) => JugadoresView(),
-            );
+            return MaterialPageRoute(builder: (_) => const JugadoresView());
           default:
             // Rutas dinámicas con parámetros
             if (settings.name!.startsWith('/detalle-partido/')) {
@@ -230,10 +241,12 @@ class _KickUpAppState extends State<KickUpApp> {
                     DetallePistaView(pistaId: id, userId: userIdToUse),
               );
             } else {
-              // Ruta por defecto basada en autenticación
+              // Ruta por defecto basada en autenticación y tipo de usuario
+              print('Ruta por defecto - esAdmin: ${widget.esAdmin}'); // Debug
               return MaterialPageRoute(
-                builder: (_) =>
-                    widget.isAuthenticated ? PartidosView() : LogInPage(),
+                builder: (_) => widget.isAuthenticated 
+                    ? (widget.esAdmin ? const JugadoresView() : const PartidosView())
+                    : LogInPage(),
               );
             }
         }

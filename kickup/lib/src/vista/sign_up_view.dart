@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:kickup/src/modelo/user_model.dart';
+import 'package:kickup/src/vista/log_in_view.dart';
 import '../controlador/auth_controller.dart';
 import '../modelo/signup_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -453,7 +454,7 @@ class _RegistroViewState extends State<RegistroView> {
                       Navigator.pushAndRemoveUntil(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => PartidosView(),
+                          builder: (context) => LogInPage(),
                         ),
                         (route) => false,
                       );

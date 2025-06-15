@@ -671,7 +671,7 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
             UserModel(
                 id: widget.userId,
                 email: 'usuario@example.com',
-                nombre: 'Usuario Actual',
+                nombre: 'Yo',
                 esAdmin: false),
           ],
         );

@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:kickup/src/vista/partidos_view.dart';
+import 'package:kickup/src/vista/jugadores_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../modelo/signup_model.dart';
 import '../modelo/user_model.dart';
@@ -60,8 +61,9 @@ class AuthController {
   }
 
   /** Gestiona el proceso completo de login y navegación posterior.
+     Verifica si el usuario es admin antes de navegar.
      Intenta iniciar sesión, guarda el ID del usuario en SharedPreferences
-     y navega a la pantalla principal si es exitoso. */
+     y navega a la pantalla correcta según el tipo de usuario. */
   Future<void> handleLogin(
       BuildContext context, String email, String password) async {
     try {
@@ -74,9 +76,8 @@ class AuthController {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('user_id', userId);
 
-        if (context.mounted) {
-          navigateToPartidos(context, userId);
-        }
+        // CAMBIO: Verificar si es admin antes de navegar
+        await _navigateBasedOnUserType(context, userId);
       } else if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Error en el inicio de sesión')),
@@ -91,11 +92,55 @@ class AuthController {
     }
   }
 
+  /** Navega a la pantalla correcta según el tipo de usuario.
+     Verifica en Firestore si el usuario es admin y navega en consecuencia. */
+  Future<void> _navigateBasedOnUserType(
+      BuildContext context, String userId) async {
+    try {
+      // Consultar Firestore para verificar si es admin
+      final doc = await _firestore.collection('usuarios').doc(userId).get();
+
+      if (!doc.exists) {
+        if (context.mounted) {
+          navigateToPartidos(context, userId);
+        }
+        return;
+      }
+
+      final userData = doc.data() as Map<String, dynamic>;
+      final isAdmin =
+          userData['isAdmin'] == true || userData['esAdmin'] == true;
+
+      if (context.mounted) {
+        if (isAdmin) {
+          navigateToJugadores(context, userId);
+        } else {
+          navigateToPartidos(context, userId);
+        }
+      }
+    } catch (e) {
+      print('Error verificando tipo de usuario: $e');
+      if (context.mounted) {
+        // En caso de error, ir a partidos por defecto
+        navigateToPartidos(context, userId);
+      }
+    }
+  }
+
   /** Navega a la pantalla de partidos. */
   void navigateToPartidos(BuildContext context, String userId) {
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (context) => PartidosView(),
+        builder: (context) => const PartidosView(),
+      ),
+    );
+  }
+
+  /** Navega a la pantalla de jugadores (para admins). */
+  void navigateToJugadores(BuildContext context, String userId) {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (context) => const JugadoresView(),
       ),
     );
   }

@@ -12,14 +12,18 @@ import '../modelo/pista_model.dart';
 class DetallePistaView extends StatefulWidget {
   /** ID de la pista a mostrar */
   final String pistaId;
-  
+
   /** ID del usuario actual */
   final String userId;
+
+  /** Indica si el usuario es admin */
+  final bool esAdmin;
 
   const DetallePistaView({
     Key? key,
     required this.pistaId,
     required this.userId,
+    this.esAdmin = false,
   }) : super(key: key);
 
   @override
@@ -37,8 +41,6 @@ class _DetallePistaViewState extends State<DetallePistaView> {
   bool _procesandoReserva = false;
   Set<Marker> _markers = {};
   GoogleMapController? _mapController;
-
-  bool esAdmin = false; 
 
   @override
   void initState() {
@@ -216,11 +218,11 @@ class _DetallePistaViewState extends State<DetallePistaView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildImageSection(), // Imagen de la pista
-          _buildInfoSection(), // Información detallada
-          _buildMapSection(), // Mapa de ubicación
-          _buildReserveButton(), // Botón de reserva
-          const SizedBox(height: 16),
+          _buildImageSection(),
+          _buildInfoSection(),
+          _buildMapSection(),
+          if (!widget.esAdmin) _buildReserveButton(), // Solo muestra el botón si NO es admin
+          const SizedBox(height: 24),
         ],
       ),
     );
@@ -234,7 +236,7 @@ class _DetallePistaViewState extends State<DetallePistaView> {
         color: Colors.grey[300],
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha(25), 
+            color: Colors.black.withAlpha(25),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -253,8 +255,7 @@ class _DetallePistaViewState extends State<DetallePistaView> {
                           ? AssetImage(_pista!.imagenUrl!) as ImageProvider
                           : NetworkImage(_pista!.imagenUrl!),
                       fit: BoxFit.cover,
-                      onError: (exception, stackTrace) {
-                      },
+                      onError: (exception, stackTrace) {},
                     )
                   : null,
             ),
@@ -276,7 +277,7 @@ class _DetallePistaViewState extends State<DetallePistaView> {
                 end: Alignment.bottomCenter,
                 colors: [
                   Colors.transparent,
-                  Colors.black.withAlpha(76), 
+                  Colors.black.withAlpha(76),
                 ],
               ),
             ),
@@ -376,8 +377,7 @@ class _DetallePistaViewState extends State<DetallePistaView> {
           ),
 
           // Descripción si existe
-          if (_pista!.descripcion != null &&
-              _pista!.descripcion!.isNotEmpty) ...[
+          if (_pista!.descripcion != null && _pista!.descripcion!.isNotEmpty) ...[
             const SizedBox(height: 20),
             const Text(
               'Descripción',
@@ -498,7 +498,7 @@ class _DetallePistaViewState extends State<DetallePistaView> {
                   // Overlay de carga del mapa
                   if (!_mapLoaded)
                     Container(
-                      color: Colors.white.withAlpha(178), 
+                      color: Colors.white.withAlpha(178),
                       child: const Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,

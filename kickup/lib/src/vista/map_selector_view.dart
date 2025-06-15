@@ -125,10 +125,10 @@ class _MapSelectorViewState extends State<MapSelectorView> {
 
       // Obtener posición actual con timeout
       final position = await Geolocator.getCurrentPosition(
-        // ignore: deprecated_member_use
-        desiredAccuracy: LocationAccuracy.high,
-        // ignore: deprecated_member_use
-        timeLimit: const Duration(seconds: 10),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 10,
+        ),
       );
 
       if (mounted) {
