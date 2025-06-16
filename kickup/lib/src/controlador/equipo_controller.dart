@@ -43,8 +43,9 @@ class EquipoController {
   }
 
   /** Crea un nuevo equipo con imagen de logo opcional.
-     Sube la imagen a Firebase Storage si se proporciona y guarda el equipo en Firestore. */
-  Future<bool> crearEquipoConImagen(EquipoModel equipo, File? logoImage) async {
+     Sube la imagen a Firebase Storage si se proporciona y guarda el equipo en Firestore. 
+     MODIFICADO: Ahora guarda el ID del creador en el equipo. */
+  Future<bool> crearEquipoConImagen(EquipoModel equipo, File? logoImage, String creadorId) async {
     try {
       String logoUrl = equipo.logoUrl;
 
@@ -63,9 +64,40 @@ class EquipoController {
       final id = equipo.id.isEmpty
           ? 'equipo_${DateTime.now().millisecondsSinceEpoch}'
           : equipo.id;
-      final equipoConId = equipoConLogo.copyWith(id: id);
+      
+      // Crear el equipo con el creador incluido
+      final equipoConId = equipoConLogo.copyWith(
+        id: id,
+        jugadoresIds: [creadorId], // Añadir el creador como primer jugador
+      );
 
-      await _firestore.collection('equipos').doc(id).set(equipoConId.toJson());
+      // Obtener datos del creador para añadirlo al array de jugadores
+      final userDoc = await _firestore.collection('usuarios').doc(creadorId).get();
+      if (userDoc.exists) {
+        final userData = userDoc.data()!;
+        final creadorData = {
+          'id': creadorId,
+          'nombre': userData['nombre'] ?? '',
+          'apellidos': userData['apellidos'] ?? '',
+          'posicion': userData['posicion'] ?? 'Sin posición',
+          'puntos': userData['puntos'] ?? 15,
+        };
+
+        // Guardar el equipo con información del creador
+        await _firestore.collection('equipos').doc(id).set({
+          ...equipoConId.toJson(),
+          'creadorId': creadorId, // NUEVO: Guardar ID del creador
+          'fechaCreacion': FieldValue.serverTimestamp(),
+          'jugadores': [creadorData], // Añadir creador al array de jugadores
+        });
+      } else {
+        // Si no se encuentra el usuario, crear sin jugadores
+        await _firestore.collection('equipos').doc(id).set({
+          ...equipoConId.toJson(),
+          'creadorId': creadorId,
+          'fechaCreacion': FieldValue.serverTimestamp(),
+        });
+      }
 
       return true;
     } catch (e) {
@@ -74,16 +106,36 @@ class EquipoController {
     }
   }
 
-  /** Crea un nuevo equipo y asigna al usuario creador como capitán. */
+  /** Crea un nuevo equipo y asigna al usuario creador como capitán.
+     MODIFICADO: Ahora guarda el ID del creador. */
   Future<bool> crearEquipo(EquipoModel equipo, String userIdCreador) async {
     try {
+      // Obtener datos del creador
+      final userDoc = await _firestore.collection('usuarios').doc(userIdCreador).get();
+      if (!userDoc.exists) return false;
+
+      final userData = userDoc.data()!;
+      final creadorData = {
+        'id': userIdCreador,
+        'nombre': userData['nombre'] ?? '',
+        'apellidos': userData['apellidos'] ?? '',
+        'posicion': userData['posicion'] ?? 'Sin posición',
+        'puntos': userData['puntos'] ?? 15,
+      };
+
       final equipoConCapitan = equipo.copyWith(
         jugadoresIds: [userIdCreador],
       );
+
       await _firestore
           .collection('equipos')
           .doc(equipoConCapitan.id)
-          .set(equipoConCapitan.toJson());
+          .set({
+            ...equipoConCapitan.toJson(),
+            'creadorId': userIdCreador, // NUEVO: Guardar ID del creador
+            'fechaCreacion': FieldValue.serverTimestamp(),
+            'jugadores': [creadorData], // Añadir creador al array de jugadores
+          });
       return true;
     } catch (e) {
       print('Error al crear equipo: $e');
@@ -127,38 +179,92 @@ class EquipoController {
     }
   }
 
+  /** NUEVO: Verifica si un usuario es el creador de un equipo específico. */
+  Future<bool> esCreadorDelEquipo(String equipoId, String userId) async {
+    try {
+      final equipoDoc = await _firestore.collection('equipos').doc(equipoId).get();
+      if (equipoDoc.exists) {
+        final data = equipoDoc.data() as Map<String, dynamic>;
+        final creadorId = data['creadorId'] as String?;
+        return creadorId == userId;
+      }
+      return false;
+    } catch (e) {
+      print('Error al verificar creador del equipo: $e');
+      return false;
+    }
+  }
+
   /** Permite a un usuario unirse a un equipo.
-     Utiliza transacciones para garantizar consistencia de datos. */
+     Método único con verificación de duplicados y transacción atómica. */
   Future<bool> unirseEquipo(String equipoId, String userId) async {
     try {
-      final equipoRef = _firestore.collection('equipos').doc(equipoId);
-      final usuarioDoc =
-          await _firestore.collection('usuarios').doc(userId).get();
-      final userData = usuarioDoc.data();
-
       return await _firestore.runTransaction<bool>((transaction) async {
-        final doc = await transaction.get(equipoRef);
-        if (!doc.exists) return false;
+        // Obtener referencias
+        final equipoRef = _firestore.collection('equipos').doc(equipoId);
+        final userRef = _firestore.collection('usuarios').doc(userId);
 
-        final data = doc.data()!;
-        final jugadoresIds = List<String>.from(data['jugadoresIds'] ?? []);
-        final jugadores =
-            List<Map<String, dynamic>>.from(data['jugadores'] ?? []);
+        // Leer documentos
+        final equipoDoc = await transaction.get(equipoRef);
+        final userDoc = await transaction.get(userRef);
 
-        if (jugadoresIds.contains(userId)) return true;
+        if (!equipoDoc.exists || !userDoc.exists) {
+          return false;
+        }
 
-        jugadoresIds.add(userId);
-        jugadores.add({
+        final equipoData = equipoDoc.data()!;
+        final userData = userDoc.data()!;
+
+        // Verificar si ya es miembro
+        final jugadoresIds = List<String>.from(equipoData['jugadoresIds'] ?? []);
+        if (jugadoresIds.contains(userId)) {
+          // Ya es miembro, no hacer nada
+          return true;
+        }
+
+        // Obtener lista actual de jugadores y eliminar duplicados por ID
+        final jugadoresRaw = List<Map<String, dynamic>>.from(equipoData['jugadores'] ?? []);
+        final jugadoresMap = <String, Map<String, dynamic>>{};
+        
+        // Crear mapa para eliminar duplicados
+        for (var jugador in jugadoresRaw) {
+          final id = jugador['id'];
+          if (id != null) {
+            jugadoresMap[id] = jugador;
+          }
+        }
+
+        // Verificar nuevamente en el array de jugadores
+        if (jugadoresMap.containsKey(userId)) {
+          // Ya existe en el array, solo actualizar jugadoresIds si es necesario
+          if (!jugadoresIds.contains(userId)) {
+            jugadoresIds.add(userId);
+            transaction.update(equipoRef, {
+              'jugadoresIds': jugadoresIds,
+              'lastUpdated': FieldValue.serverTimestamp(),
+            });
+          }
+          return true;
+        }
+
+        // Crear nuevo objeto jugador
+        final nuevoJugador = {
           'id': userId,
-          'nombre': userData?['nombre'] ?? '',
-          'apellidos': userData?['apellidos'] ?? '',
-          'posicion': userData?['posicion'] ?? '',
-          'profileImageUrl': userData?['profileImageUrl'] ?? '',
-        });
+          'nombre': userData['nombre'] ?? '',
+          'apellidos': userData['apellidos'] ?? '',
+          'posicion': userData['posicion'] ?? 'Sin posición',
+          'puntos': userData['puntos'] ?? 15,
+        };
 
+        // Añadir a las listas
+        jugadoresIds.add(userId);
+        jugadoresMap[userId] = nuevoJugador;
+
+        // Actualizar documento
         transaction.update(equipoRef, {
           'jugadoresIds': jugadoresIds,
-          'jugadores': jugadores,
+          'jugadores': jugadoresMap.values.toList(),
+          'lastUpdated': FieldValue.serverTimestamp(),
         });
 
         return true;
@@ -173,25 +279,26 @@ class EquipoController {
      Utiliza transacciones para garantizar consistencia de datos. */
   Future<bool> abandonarEquipo(String equipoId, String userId) async {
     try {
-      final equipoRef = _firestore.collection('equipos').doc(equipoId);
-
       return await _firestore.runTransaction<bool>((transaction) async {
+        final equipoRef = _firestore.collection('equipos').doc(equipoId);
         final doc = await transaction.get(equipoRef);
+        
         if (!doc.exists) return false;
 
         final data = doc.data()!;
         final jugadoresIds = List<String>.from(data['jugadoresIds'] ?? []);
-        final jugadores =
-            List<Map<String, dynamic>>.from(data['jugadores'] ?? []);
+        final jugadores = List<Map<String, dynamic>>.from(data['jugadores'] ?? []);
 
         if (!jugadoresIds.contains(userId)) return true;
 
+        // Remover de ambas listas
         jugadoresIds.remove(userId);
         jugadores.removeWhere((jugador) => jugador['id'] == userId);
 
         transaction.update(equipoRef, {
           'jugadoresIds': jugadoresIds,
           'jugadores': jugadores,
+          'lastUpdated': FieldValue.serverTimestamp(),
         });
 
         return true;
@@ -227,15 +334,42 @@ class EquipoController {
     }
   }
 
-  /** Elimina un equipo específico. Solo disponible para administradores. */
+  /** MODIFICADO: Elimina un equipo específico. 
+     Disponible para administradores Y creadores del equipo. */
   Future<bool> eliminarEquipo(String equipoId, String userId) async {
     try {
+      // Verificar si es admin o creador del equipo
       final esAdmin = await esUsuarioAdmin(userId);
-      if (!esAdmin) {
-        print('Usuario no tiene permisos de administrador');
+      final esCreador = await esCreadorDelEquipo(equipoId, userId);
+      
+      if (!esAdmin && !esCreador) {
+        print('Usuario no tiene permisos para eliminar este equipo');
         return false;
       }
 
+      // Eliminar logo del equipo de Firebase Storage si existe
+      try {
+        final equipoDoc = await _firestore.collection('equipos').doc(equipoId).get();
+        if (equipoDoc.exists) {
+          final data = equipoDoc.data() as Map<String, dynamic>;
+          final logoUrl = data['logoUrl'] as String?;
+          
+          if (logoUrl != null && logoUrl.isNotEmpty) {
+            // Extraer el path del logo desde la URL
+            final uri = Uri.parse(logoUrl);
+            final pathSegments = uri.pathSegments;
+            if (pathSegments.length >= 2) {
+              final logoPath = pathSegments.sublist(1).join('/');
+              await _storage.ref(logoPath).delete();
+            }
+          }
+        }
+      } catch (e) {
+        print('Error al eliminar logo del equipo: $e');
+        // Continuar con la eliminación del equipo aunque falle la eliminación del logo
+      }
+
+      // Eliminar el documento del equipo
       await _firestore.collection('equipos').doc(equipoId).delete();
       return true;
     } catch (e) {

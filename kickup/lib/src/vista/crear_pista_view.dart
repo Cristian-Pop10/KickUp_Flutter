@@ -8,15 +8,15 @@ import '../modelo/pista_model.dart';
 import 'package:uuid/uuid.dart';
 import 'map_selector_view.dart';
 
-/** Vista para crear o editar una pista deportiva.
- * Permite al usuario ingresar información completa de la pista incluyendo
- * ubicación mediante Google Maps, tipos múltiples, imágenes y validación
- * de formulario. Incluye integración con servicios de ubicación y geocodificación.
+/** Vista para crear o editar pistas deportivas con integración de Google Maps.
+ * Permite seleccionar ubicación mediante tap en mapa, gestión de tipos múltiples,
+ * validación de formularios y previsualización de imágenes. Incluye funcionalidad
+ * de geocodificación inversa para obtener direcciones automáticamente.
  */
 class CrearPistaView extends StatefulWidget {
   /** ID del usuario que está creando/editando la pista */
   final String userId;
-
+  
   /** Pista existente para modo edición (null para crear nueva) */
   final PistaModel? pistaExistente;
 
@@ -31,28 +31,31 @@ class CrearPistaView extends StatefulWidget {
 }
 
 class _CrearPistaViewState extends State<CrearPistaView> {
+  // Controladores para manejar la lógica de negocio
   final _formKey = GlobalKey<FormState>();
   final PistaController _pistaController = PistaController();
+  
+  // Variables de estado principales
   bool _isLoading = false;
   bool _esAdmin = false;
+  bool _disponible = true;
 
-  // Controladores para los campos del formulario
+  // Controladores de campos de texto del formulario
   late final TextEditingController _nombreController;
   late final TextEditingController _direccionController;
   late final TextEditingController _descripcionController;
   late final TextEditingController _precioController;
   late final TextEditingController _imagenUrlController;
-  bool _disponible = true;
 
-  // Variables para ubicación y mapa
+  // Variables para manejo de ubicación y mapa
   double? _latitud;
   double? _longitud;
   bool _cargandoUbicacion = false;
-  String _ubicacionTexto = 'Toca "Seleccionar en mapa" para elegir ubicación';
+  String _ubicacionTexto = 'Toca en el mapa para seleccionar ubicación';
   GoogleMapController? _mapController;
   Set<Marker> _markers = {};
 
-  /** Lista de tipos de pista disponibles para selección múltiple */
+  // Configuración de tipos de pista disponibles
   final List<String> _tiposDisponibles = [
     'Fútbol 7',
     'Fútbol 11',
@@ -63,36 +66,47 @@ class _CrearPistaViewState extends State<CrearPistaView> {
   @override
   void initState() {
     super.initState();
+    _inicializarVista();
+  }
 
+  /** Inicializa la vista y sus componentes principales.
+   * Configura controladores, verifica permisos y carga datos existentes
+   * si se está editando una pista.
+   */
+  void _inicializarVista() {
     try {
-      // Inicializar controladores
-      _nombreController = TextEditingController();
-      _direccionController = TextEditingController();
-      _descripcionController = TextEditingController();
-      _precioController = TextEditingController();
-      _imagenUrlController = TextEditingController();
-
-      // Verificar si el usuario es administrador
+      _inicializarControladores();
       _verificarPermisos();
 
-      // Si estamos editando, cargar los datos de la pista existente
       if (widget.pistaExistente != null) {
         _cargarDatosPista();
       } else {
-        // Establecer ubicación por defecto (Madrid)
-        _latitud = 40.416775;
-        _longitud = -3.703790;
-        _actualizarMarcador();
+        _establecerUbicacionPorDefecto();
       }
     } catch (e, stackTrace) {
-      print('Error en initState: $e');
-      print('StackTrace: $stackTrace');
-      _mostrarError('Error al inicializar la vista: $e');
+      _manejarError('Error al inicializar la vista', e, stackTrace);
     }
   }
 
+  /** Inicializa todos los controladores de texto del formulario */
+  void _inicializarControladores() {
+    _nombreController = TextEditingController();
+    _direccionController = TextEditingController();
+    _descripcionController = TextEditingController();
+    _precioController = TextEditingController();
+    _imagenUrlController = TextEditingController();
+  }
+
+  /** Establece Madrid como ubicación por defecto para nuevas pistas */
+  void _establecerUbicacionPorDefecto() {
+    _latitud = 40.416775;
+    _longitud = -3.703790;
+    _actualizarMarcador();
+  }
+
   /** Verifica si el usuario actual tiene permisos de administrador.
-   * Actualiza el estado _esAdmin según el resultado de la verificación.
+   * Los administradores tienen acceso a funcionalidades adicionales
+   * como crear pistas sin restricciones.
    */
   Future<void> _verificarPermisos() async {
     try {
@@ -104,8 +118,7 @@ class _CrearPistaViewState extends State<CrearPistaView> {
         });
       }
     } catch (e, stackTrace) {
-      print('Error al verificar permisos: $e');
-      print('StackTrace: $stackTrace');
+      _manejarError('Error al verificar permisos', e, stackTrace);
       if (mounted) {
         setState(() {
           _esAdmin = false;
@@ -116,6 +129,12 @@ class _CrearPistaViewState extends State<CrearPistaView> {
 
   @override
   void dispose() {
+    _liberarRecursos();
+    super.dispose();
+  }
+
+  /** Libera todos los recursos utilizados para evitar memory leaks */
+  void _liberarRecursos() {
     try {
       _nombreController.dispose();
       _direccionController.dispose();
@@ -126,12 +145,11 @@ class _CrearPistaViewState extends State<CrearPistaView> {
     } catch (e) {
       print('Error en dispose: $e');
     }
-    super.dispose();
   }
 
-  /** Carga los datos de la pista existente en el formulario.
-   * Utilizado en modo edición para prellenar todos los campos
-   * con la información actual de la pista.
+  /** Carga los datos de la pista existente en el formulario (modo edición).
+   * Rellena todos los campos del formulario con la información de la pista
+   * y configura el mapa con la ubicación actual.
    */
   void _cargarDatosPista() {
     try {
@@ -141,37 +159,46 @@ class _CrearPistaViewState extends State<CrearPistaView> {
         return;
       }
 
-      _nombreController.text = pista.nombre;
-      _direccionController.text = pista.direccion;
-      _descripcionController.text = pista.descripcion ?? '';
-      _precioController.text = pista.precio?.toString() ?? '';
-      _imagenUrlController.text = pista.imagenUrl ?? '';
-      _disponible = pista.disponible;
-
-      // Cargar tipos seleccionados
-      if (pista.tipo != null && pista.tipo!.isNotEmpty) {
-        _tiposSeleccionados = pista.tipo!
-            .split(', ')
-            .where((tipo) => _tiposDisponibles.contains(tipo))
-            .toList();
-      }
-
-      // Establecer coordenadas
-      _latitud = pista.latitud;
-      _longitud = pista.longitud;
-      _ubicacionTexto =
-          'Lat: ${pista.latitud.toStringAsFixed(6)}, Lng: ${pista.longitud.toStringAsFixed(6)}';
-      _actualizarMarcador();
+      _cargarCamposTexto(pista);
+      _cargarTiposSeleccionados(pista);
+      _cargarUbicacionExistente(pista);
     } catch (e, stackTrace) {
-      print('Error al cargar datos de pista: $e');
-      print('StackTrace: $stackTrace');
-      _mostrarError('Error al cargar datos de la pista: $e');
+      _manejarError('Error al cargar datos de pista', e, stackTrace);
     }
+  }
+
+  /** Carga los campos de texto con los datos de la pista existente */
+  void _cargarCamposTexto(PistaModel pista) {
+    _nombreController.text = pista.nombre;
+    _direccionController.text = pista.direccion;
+    _descripcionController.text = pista.descripcion ?? '';
+    _precioController.text = pista.precio?.toString() ?? '';
+    _imagenUrlController.text = pista.imagenUrl ?? '';
+    _disponible = pista.disponible;
+  }
+
+  /** Carga los tipos de pista seleccionados desde la cadena almacenada */
+  void _cargarTiposSeleccionados(PistaModel pista) {
+    if (pista.tipo != null && pista.tipo!.isNotEmpty) {
+      _tiposSeleccionados = pista.tipo!
+          .split(', ')
+          .where((tipo) => _tiposDisponibles.contains(tipo))
+          .toList();
+    }
+  }
+
+  /** Carga la ubicación existente de la pista en el mapa */
+  void _cargarUbicacionExistente(PistaModel pista) {
+    _latitud = pista.latitud;
+    _longitud = pista.longitud;
+    _ubicacionTexto =
+        'Lat: ${pista.latitud.toStringAsFixed(6)}, Lng: ${pista.longitud.toStringAsFixed(6)}';
+    _actualizarMarcador();
   }
 
   /** Actualiza el marcador en el mapa con la ubicación actual.
    * Crea un nuevo marcador rojo en las coordenadas especificadas
-   * y actualiza el texto de ubicación mostrado.
+   * y actualiza el texto de ubicación mostrado al usuario.
    */
   void _actualizarMarcador() {
     if (_latitud != null && _longitud != null) {
@@ -195,8 +222,8 @@ class _CrearPistaViewState extends State<CrearPistaView> {
   }
 
   /** Abre el selector de mapa en pantalla completa.
-   * Navega a MapSelectorView y procesa el resultado para actualizar
-   * la ubicación seleccionada y la dirección si es necesario.
+   * Permite al usuario seleccionar una ubicación con mayor precisión
+   * en una vista de mapa expandida con más herramientas de navegación.
    */
   Future<void> _abrirSelectorMapa() async {
     final result = await Navigator.of(context).push<Map<String, dynamic>>(
@@ -210,33 +237,38 @@ class _CrearPistaViewState extends State<CrearPistaView> {
     );
 
     if (result != null && mounted) {
-      setState(() {
-        _latitud = result['latitude'];
-        _longitud = result['longitude'];
-        _ubicacionTexto = result['address'] ?? 'Ubicación seleccionada';
-      });
-
-      // Actualizar dirección si está vacía
-      if (_direccionController.text.isEmpty && result['address'] != null) {
-        _direccionController.text = result['address'];
-      }
-
-      _actualizarMarcador();
-
-      // Mover cámara en el mapa pequeño
-      if (_mapController != null) {
-        _mapController!.animateCamera(
-          CameraUpdate.newLatLngZoom(
-            LatLng(_latitud!, _longitud!),
-            15,
-          ),
-        );
-      }
+      _procesarResultadoSelectorMapa(result);
     }
   }
 
-  /** Maneja el tap en el mapa pequeño para seleccionar ubicación.
-   * Actualiza las coordenadas y obtiene la dirección correspondiente.
+  /** Procesa el resultado del selector de mapa en pantalla completa */
+  void _procesarResultadoSelectorMapa(Map<String, dynamic> result) {
+    setState(() {
+      _latitud = result['latitude'];
+      _longitud = result['longitude'];
+    });
+
+    _actualizarMarcador();
+    _obtenerDireccionDesdeCoordenadas(_latitud!, _longitud!);
+    _moverCamaraAUbicacion();
+  }
+
+  /** Mueve la cámara del mapa a la ubicación seleccionada con animación */
+  void _moverCamaraAUbicacion() {
+    if (_mapController != null) {
+      _mapController!.animateCamera(
+        CameraUpdate.newLatLngZoom(
+          LatLng(_latitud!, _longitud!),
+          15,
+        ),
+      );
+    }
+  }
+
+  /** Maneja el tap en el mapa para seleccionar una nueva ubicación.
+   * Actualiza las coordenadas, el marcador y obtiene la dirección
+   * correspondiente mediante geocodificación inversa.
+   * @param position Posición seleccionada en el mapa
    */
   void _onMapTap(LatLng position) {
     setState(() {
@@ -248,8 +280,8 @@ class _CrearPistaViewState extends State<CrearPistaView> {
   }
 
   /** Obtiene la ubicación actual del usuario usando GPS.
-   * Solicita permisos necesarios y maneja errores de ubicación.
-   * Actualiza automáticamente el mapa y obtiene la dirección.
+   * Solicita permisos necesarios y maneja todos los casos de error
+   * posibles como servicios deshabilitados o permisos denegados.
    */
   Future<void> _obtenerUbicacionActual() async {
     if (!mounted) return;
@@ -259,109 +291,94 @@ class _CrearPistaViewState extends State<CrearPistaView> {
         _cargandoUbicacion = true;
       });
 
-      // Verificar si el servicio de ubicación está habilitado
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        print('Servicios de ubicación deshabilitados');
-        _mostrarMensaje('Los servicios de ubicación están deshabilitados');
-        setState(() {
-          _cargandoUbicacion = false;
-        });
-        return;
-      }
+      if (!await _verificarServiciosUbicacion()) return;
+      if (!await _verificarPermisosUbicacion()) return;
 
-      // Verificar permisos de ubicación
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          print('Permisos de ubicación denegados');
-          _mostrarMensaje('Permisos de ubicación denegados');
-          setState(() {
-            _cargandoUbicacion = false;
-          });
-          return;
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        _mostrarMensaje('Permisos de ubicación denegados permanentemente');
-        setState(() {
-          _cargandoUbicacion = false;
-        });
-        return;
-      }
-
-      // Obtener posición actual con timeout
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 10),
-        ),
-      );
-
-      if (mounted) {
-        setState(() {
-          _latitud = position.latitude;
-          _longitud = position.longitude;
-          _cargandoUbicacion = false;
-        });
-
-        _actualizarMarcador();
-
-        // Mover cámara a la nueva ubicación
-        if (_mapController != null) {
-          _mapController!.animateCamera(
-            CameraUpdate.newLatLngZoom(
-              LatLng(position.latitude, position.longitude),
-              15,
-            ),
-          );
-        }
-
-        // Intentar obtener dirección
-        _obtenerDireccionDesdeCoordenadas(
-            position.latitude, position.longitude);
-      }
+      final position = await _obtenerPosicionGPS();
+      _procesarUbicacionObtenida(position);
     } catch (e, stackTrace) {
-      print('Error al obtener ubicación: $e');
-      print('StackTrace: $stackTrace');
-      _mostrarMensaje('Error al obtener ubicación actual: $e');
-      if (mounted) {
-        setState(() {
-          _cargandoUbicacion = false;
-        });
-      }
+      _manejarErrorUbicacion('Error al obtener ubicación actual', e, stackTrace);
     }
   }
 
-  /** Obtiene la dirección legible a partir de coordenadas.
-   * Utiliza geocodificación inversa para convertir lat/lng en dirección.
-   * Actualiza automáticamente el campo de dirección si está vacío.
+  /** Verifica si los servicios de ubicación están habilitados en el dispositivo */
+  Future<bool> _verificarServiciosUbicacion() async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      print('Servicios de ubicación deshabilitados');
+      _mostrarMensaje('Los servicios de ubicación están deshabilitados');
+      setState(() {
+        _cargandoUbicacion = false;
+      });
+      return false;
+    }
+    return true;
+  }
+
+  /** Verifica y solicita permisos de ubicación al usuario */
+  Future<bool> _verificarPermisosUbicacion() async {
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        print('Permisos de ubicación denegados');
+        _mostrarMensaje('Permisos de ubicación denegados');
+        setState(() {
+          _cargandoUbicacion = false;
+        });
+        return false;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      _mostrarMensaje('Permisos de ubicación denegados permanentemente');
+      setState(() {
+        _cargandoUbicacion = false;
+      });
+      return false;
+    }
+
+    return true;
+  }
+
+  /** Obtiene la posición GPS actual con alta precisión */
+  Future<Position> _obtenerPosicionGPS() async {
+    return await Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        timeLimit: Duration(seconds: 10),
+      ),
+    );
+  }
+
+  /** Procesa la ubicación obtenida del GPS y actualiza la interfaz */
+  void _procesarUbicacionObtenida(Position position) {
+    if (mounted) {
+      setState(() {
+        _latitud = position.latitude;
+        _longitud = position.longitude;
+        _cargandoUbicacion = false;
+      });
+
+      _actualizarMarcador();
+      _moverCamaraAUbicacion();
+      _obtenerDireccionDesdeCoordenadas(position.latitude, position.longitude);
+    }
+  }
+
+  /** Obtiene la dirección legible a partir de coordenadas (geocodificación inversa).
+   * Utiliza el servicio de geocoding para convertir coordenadas en una
+   * dirección legible que se muestra automáticamente en el campo de dirección.
+   * @param lat Latitud de la ubicación
+   * @param lng Longitud de la ubicación
    */
   Future<void> _obtenerDireccionDesdeCoordenadas(double lat, double lng) async {
     try {
       List<Placemark> placemarks = await placemarkFromCoordinates(lat, lng);
 
       if (placemarks.isNotEmpty && mounted) {
-        final placemark = placemarks.first;
-        final street = placemark.street ?? '';
-        final locality = placemark.locality ?? '';
-        final country = placemark.country ?? '';
-
-        String direccion = '';
-        if (street.isNotEmpty) direccion += street;
-        if (locality.isNotEmpty) {
-          if (direccion.isNotEmpty) direccion += ', ';
-          direccion += locality;
-        }
-        if (country.isNotEmpty) {
-          if (direccion.isNotEmpty) direccion += ', ';
-          direccion += country;
-        }
-
-        // Actualizar el campo de dirección si está vacío
-        if (_direccionController.text.isEmpty && direccion.isNotEmpty) {
+        final direccion = _construirDireccionLegible(placemarks.first);
+        if (direccion.isNotEmpty) {
           _direccionController.text = direccion;
         }
       }
@@ -371,61 +388,28 @@ class _CrearPistaViewState extends State<CrearPistaView> {
     }
   }
 
-  /** Busca una dirección y obtiene sus coordenadas.
-   * Utiliza geocodificación para convertir dirección en lat/lng.
-   * Actualiza el mapa con la nueva ubicación encontrada.
+  /** Construye una dirección legible a partir de un Placemark.
+   * Combina calle, localidad y país en una cadena formateada.
+   * @param placemark Información de ubicación obtenida del geocoding
+   * @return Dirección formateada como cadena
    */
-  Future<void> _buscarDireccion(String direccion) async {
-    if (direccion.trim().isEmpty) {
-      _mostrarMensaje('Por favor ingresa una dirección');
-      return;
+  String _construirDireccionLegible(Placemark placemark) {
+    final street = placemark.street ?? '';
+    final locality = placemark.locality ?? '';
+    final country = placemark.country ?? '';
+
+    String direccion = '';
+    if (street.isNotEmpty) direccion += street;
+    if (locality.isNotEmpty) {
+      if (direccion.isNotEmpty) direccion += ', ';
+      direccion += locality;
+    }
+    if (country.isNotEmpty) {
+      if (direccion.isNotEmpty) direccion += ', ';
+      direccion += country;
     }
 
-    try {
-      setState(() {
-        _cargandoUbicacion = true;
-      });
-
-      List<Location> locations = await locationFromAddress(direccion);
-
-      if (locations.isNotEmpty && mounted) {
-        final location = locations.first;
-
-        setState(() {
-          _latitud = location.latitude;
-          _longitud = location.longitude;
-          _cargandoUbicacion = false;
-        });
-
-        _actualizarMarcador();
-
-        // Mover cámara a la nueva ubicación
-        if (_mapController != null) {
-          _mapController!.animateCamera(
-            CameraUpdate.newLatLngZoom(
-              LatLng(location.latitude, location.longitude),
-              15,
-            ),
-          );
-        }
-
-        _mostrarMensaje('Ubicación encontrada correctamente');
-      } else {
-        _mostrarMensaje('No se pudo encontrar la dirección');
-        setState(() {
-          _cargandoUbicacion = false;
-        });
-      }
-    } catch (e, stackTrace) {
-      print('Error al buscar dirección: $e');
-      print('StackTrace: $stackTrace');
-      _mostrarMensaje('No se pudo encontrar la dirección: $e');
-      if (mounted) {
-        setState(() {
-          _cargandoUbicacion = false;
-        });
-      }
-    }
+    return direccion;
   }
 
   /** Muestra una previsualización de la imagen en un diálogo modal.
@@ -441,61 +425,78 @@ class _CrearPistaViewState extends State<CrearPistaView> {
 
     showDialog(
       context: context,
-      builder: (context) => Dialog(
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 400, maxHeight: 400),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AppBar(
-                title: const Text('Previsualización'),
-                automaticallyImplyLeading: false,
-                actions: [
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Image.network(
-                    url,
-                    fit: BoxFit.contain,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return const Center(child: CircularProgressIndicator());
-                    },
-                    errorBuilder: (context, error, stackTrace) {
-                      return const Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.error, color: Colors.red, size: 64),
-                            SizedBox(height: 16),
-                            Text('No se pudo cargar la imagen'),
-                            SizedBox(height: 8),
-                            Text(
-                              'Verifica que la URL sea correcta',
-                              style:
-                                  TextStyle(fontSize: 12, color: Colors.grey),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ],
-          ),
+      builder: (context) => _construirDialogoPreview(url),
+    );
+  }
+
+  /** Construye el diálogo de previsualización de imagen */
+  Widget _construirDialogoPreview(String url) {
+    return Dialog(
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 400, maxHeight: 400),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _construirAppBarPreview(),
+            _construirContenidoPreview(url),
+          ],
         ),
       ),
     );
   }
 
-  /** Muestra un mensaje informativo al usuario */
+  /** Construye el AppBar del diálogo de previsualización */
+  Widget _construirAppBarPreview() {
+    return AppBar(
+      title: const Text('Previsualización'),
+      automaticallyImplyLeading: false,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ],
+    );
+  }
+
+  /** Construye el contenido del diálogo con la imagen */
+  Widget _construirContenidoPreview(String url) {
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Image.network(
+          url,
+          fit: BoxFit.contain,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return const Center(child: CircularProgressIndicator());
+          },
+          errorBuilder: (context, error, stackTrace) => _construirErrorImagen(),
+        ),
+      ),
+    );
+  }
+
+  /** Construye el widget de error para imágenes que no cargan */
+  Widget _construirErrorImagen() {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.error, color: Colors.red, size: 64),
+          SizedBox(height: 16),
+          Text('No se pudo cargar la imagen'),
+          SizedBox(height: 8),
+          Text(
+            'Verifica que la URL sea correcta',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /** Muestra un mensaje informativo al usuario mediante SnackBar */
   void _mostrarMensaje(String mensaje) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -504,7 +505,7 @@ class _CrearPistaViewState extends State<CrearPistaView> {
     }
   }
 
-  /** Muestra un mensaje de error al usuario con estilo distintivo */
+  /** Muestra un mensaje de error con estilo distintivo */
   void _mostrarError(String error) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -517,131 +518,186 @@ class _CrearPistaViewState extends State<CrearPistaView> {
     }
   }
 
-  /** Guarda la pista en la base de datos.
-   * Valida el formulario, verifica coordenadas y tipos seleccionados,
-   * procesa la URL de imagen y crea/actualiza el modelo de pista.
+  /** Maneja errores relacionados con la ubicación */
+  void _manejarErrorUbicacion(String mensaje, dynamic error, StackTrace stackTrace) {
+    print('$mensaje: $error');
+    print('StackTrace: $stackTrace');
+    _mostrarMensaje('$mensaje: $error');
+    if (mounted) {
+      setState(() {
+        _cargandoUbicacion = false;
+      });
+    }
+  }
+
+  /** Maneja errores generales con logging detallado */
+  void _manejarError(String mensaje, dynamic error, StackTrace stackTrace) {
+    print('$mensaje: $error');
+    print('StackTrace: $stackTrace');
+    _mostrarError('$mensaje: $error');
+  }
+
+  /** Guarda la pista en la base de datos después de validar todos los campos.
+   * Realiza validaciones completas del formulario, ubicación y tipos seleccionados
+   * antes de proceder con la operación de guardado (crear o actualizar).
    */
   Future<void> _guardarPista() async {
     try {
-      // Validar el formulario
-      if (!_formKey.currentState!.validate()) {
-        print('Formulario no válido');
-        return;
-      }
-
-      // Verificar que se hayan establecido las coordenadas
-      if (_latitud == null || _longitud == null) {
-        print('No se han establecido coordenadas');
-        _mostrarMensaje(
-            'Por favor establece la ubicación de la pista en el mapa');
-        return;
-      }
-
-      // Verificar que se haya seleccionado al menos un tipo
-      if (_tiposSeleccionados.isEmpty) {
-        _mostrarMensaje('Por favor selecciona al menos un tipo de pista');
-        return;
-      }
+      if (!_validarFormularioCompleto()) return;
 
       setState(() {
         _isLoading = true;
       });
 
-      // Procesar URL de imagen con validación más flexible
-      String? imagenUrl = _imagenUrlController.text.trim();
-      if (imagenUrl.isEmpty) {
-        imagenUrl = null;
-      } else {
-        // Validación más flexible para URLs
-        if (!_esUrlValida(imagenUrl)) {
-          setState(() {
-            _isLoading = false;
-          });
-          _mostrarError(
-              'URL de imagen inválida. Debe ser una URL válida que comience con http:// o https://');
-          return;
-        }
+      final imagenUrl = await _procesarUrlImagen();
+      if (imagenUrl == null && _imagenUrlController.text.trim().isNotEmpty) {
+        return; // Error en validación de URL
       }
 
-      // Crear modelo de pista con los datos del formulario
-      final pistaId = widget.pistaExistente?.id ?? 'pista_${const Uuid().v4()}';
-      final precio = _precioController.text.trim().isEmpty
-          ? null
-          : double.tryParse(_precioController.text.trim());
-
-      final pista = PistaModel(
-        id: pistaId,
-        nombre: _nombreController.text.trim(),
-        direccion: _direccionController.text.trim(),
-        latitud: _latitud!,
-        longitud: _longitud!,
-        tipo: _tiposSeleccionados.join(', '), // Unir tipos con comas
-        descripcion: _descripcionController.text.trim().isEmpty
-            ? null
-            : _descripcionController.text.trim(),
-        precio: precio,
-        disponible: _disponible,
-        imagenUrl: imagenUrl,
-      );
-
-      // Guardar o actualizar la pista
-      bool exito;
-      if (widget.pistaExistente != null) {
-        exito = await _pistaController.actualizarPista(pista);
-      } else {
-        exito = await _pistaController.crearPista(pista);
-      }
-
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-
-        if (exito) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(widget.pistaExistente != null
-                  ? 'Pista actualizada correctamente'
-                  : 'Pista creada correctamente'),
-              backgroundColor: Colors.green,
-            ),
-          );
-          Navigator.of(context).pop(true);
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(widget.pistaExistente != null
-                  ? 'Error al actualizar la pista'
-                  : 'Error al crear la pista'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
+      final pista = _construirModeloPista(imagenUrl);
+      final exito = await _ejecutarOperacionGuardado(pista);
+      
+      _manejarResultadoGuardado(exito);
     } catch (e, stackTrace) {
-      print('Error al guardar pista: $e');
-      print('StackTrace: $stackTrace');
+      _manejarErrorGuardado(e, stackTrace);
+    }
+  }
 
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-        _mostrarError('Error al guardar la pista: $e');
+  /** Valida todo el formulario incluyendo campos, ubicación y tipos */
+  bool _validarFormularioCompleto() {
+    if (!_formKey.currentState!.validate()) {
+      print('Formulario no válido');
+      return false;
+    }
+
+    if (_latitud == null || _longitud == null) {
+      print('No se han establecido coordenadas');
+      _mostrarMensaje(
+          'Por favor selecciona la ubicación de la pista en el mapa');
+      return false;
+    }
+
+    if (_tiposSeleccionados.isEmpty) {
+      _mostrarMensaje('Por favor selecciona al menos un tipo de pista');
+      return false;
+    }
+
+    return true;
+  }
+
+  /** Procesa y valida la URL de imagen ingresada */
+  Future<String?> _procesarUrlImagen() async {
+    String? imagenUrl = _imagenUrlController.text.trim();
+    if (imagenUrl.isEmpty) {
+      return null;
+    }
+
+    if (!_esUrlValida(imagenUrl)) {
+      setState(() {
+        _isLoading = false;
+      });
+      _mostrarError(
+          'URL de imagen inválida. Debe ser una URL válida que comience con http:// o https://');
+      return null;
+    }
+
+    return imagenUrl;
+  }
+
+  /** Construye el modelo de pista con todos los datos del formulario */
+  PistaModel _construirModeloPista(String? imagenUrl) {
+    final pistaId = widget.pistaExistente?.id ?? 'pista_${const Uuid().v4()}';
+    final precio = _precioController.text.trim().isEmpty
+        ? null
+        : double.tryParse(_precioController.text.trim());
+
+    return PistaModel(
+      id: pistaId,
+      nombre: _nombreController.text.trim(),
+      direccion: _direccionController.text.trim(),
+      latitud: _latitud!,
+      longitud: _longitud!,
+      tipo: _tiposSeleccionados.join(', '),
+      descripcion: _descripcionController.text.trim().isEmpty
+          ? null
+          : _descripcionController.text.trim(),
+      precio: precio,
+      disponible: _disponible,
+      imagenUrl: imagenUrl,
+    );
+  }
+
+  /** Ejecuta la operación de guardado (crear o actualizar) según el contexto */
+  Future<bool> _ejecutarOperacionGuardado(PistaModel pista) async {
+    if (widget.pistaExistente != null) {
+      return await _pistaController.actualizarPista(pista);
+    } else {
+      return await _pistaController.crearPista(pista);
+    }
+  }
+
+  /** Maneja el resultado de la operación de guardado y muestra feedback */
+  void _manejarResultadoGuardado(bool exito) {
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (exito) {
+        _mostrarExitoGuardado();
+        Navigator.of(context).pop(true);
+      } else {
+        _mostrarErrorGuardado();
       }
     }
   }
 
+  /** Muestra mensaje de éxito al guardar */
+  void _mostrarExitoGuardado() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(widget.pistaExistente != null
+            ? 'Pista actualizada correctamente'
+            : 'Pista creada correctamente'),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
+  /** Muestra mensaje de error al guardar */
+  void _mostrarErrorGuardado() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(widget.pistaExistente != null
+            ? 'Error al actualizar la pista'
+            : 'Error al crear la pista'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+
+  /** Maneja errores durante el proceso de guardado */
+  void _manejarErrorGuardado(dynamic error, StackTrace stackTrace) {
+    print('Error al guardar pista: $error');
+    print('StackTrace: $stackTrace');
+
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+      _mostrarError('Error al guardar la pista: $error');
+    }
+  }
+
   /** Valida si una URL es válida para imágenes.
-   * Acepta URLs con o sin protocolo y verifica extensiones de imagen.
+   * Verifica el esquema HTTP/HTTPS y extensiones de imagen comunes.
    * @param url URL a validar
-   * @return true si la URL es válida, false en caso contrario
+   * @return true si la URL es válida para imágenes
    */
   bool _esUrlValida(String url) {
     try {
-      // Permitir URLs que empiecen con http, https, o incluso sin protocolo
       String urlToValidate = url.trim();
 
-      // Si no tiene protocolo, añadir https por defecto
       if (!urlToValidate.startsWith('http://') &&
           !urlToValidate.startsWith('https://')) {
         urlToValidate = 'https://$urlToValidate';
@@ -649,10 +705,8 @@ class _CrearPistaViewState extends State<CrearPistaView> {
 
       final uri = Uri.parse(urlToValidate);
 
-      // Verificar que tenga un host válido
       if (uri.host.isEmpty) return false;
 
-      // Verificar que tenga una extensión de imagen común (opcional)
       final path = uri.path.toLowerCase();
       final hasImageExtension = path.endsWith('.jpg') ||
           path.endsWith('.jpeg') ||
@@ -677,70 +731,80 @@ class _CrearPistaViewState extends State<CrearPistaView> {
     try {
       return Scaffold(
         backgroundColor: AppColors.background(context),
-        appBar: AppBar(
-          title: Text(
-            widget.pistaExistente != null ? 'Editar Pista' : 'Crear Pista',
-            style: TextStyle(color: AppColors.textPrimary(context)),
-          ),
-          backgroundColor: AppColors.background(context),
-          elevation: 0,
-          iconTheme: IconThemeData(color: AppColors.textPrimary(context)),
-          actions: _esAdmin
-              ? [
-                  Container(
-                    margin: const EdgeInsets.only(right: 16),
-                    child: Center(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.orange,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Text(
-                          'ADMIN',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ]
-              : null,
-        ),
+        appBar: _construirAppBar(),
         body: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : _buildFormView(),
         bottomNavigationBar: _buildBottomBar(),
       );
     } catch (e, stackTrace) {
-      print('Error en build: $e');
-      print('StackTrace: $stackTrace');
+      return _construirPantallaError(e, stackTrace);
+    }
+  }
 
-      return Scaffold(
-        appBar: AppBar(title: const Text('Error')),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error, size: 64, color: Colors.red),
-              const SizedBox(height: 16),
-              const Text('Ha ocurrido un error'),
-              const SizedBox(height: 8),
-              Text('$e'),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Volver'),
-              ),
-            ],
+  /** Construye el AppBar con título dinámico y badge de administrador */
+  PreferredSizeWidget _construirAppBar() {
+    return AppBar(
+      title: Text(
+        widget.pistaExistente != null ? 'Editar Pista' : 'Crear Pista',
+        style: TextStyle(color: AppColors.textPrimary(context)),
+      ),
+      backgroundColor: AppColors.background(context),
+      elevation: 0,
+      iconTheme: IconThemeData(color: AppColors.textPrimary(context)),
+      actions: _esAdmin ? [_construirBadgeAdmin()] : null,
+    );
+  }
+
+  /** Construye el badge de administrador en el AppBar */
+  Widget _construirBadgeAdmin() {
+    return Container(
+      margin: const EdgeInsets.only(right: 16),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.orange,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Text(
+            'ADMIN',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
-      );
-    }
+      ),
+    );
+  }
+
+  /** Construye la pantalla de error cuando ocurre una excepción */
+  Widget _construirPantallaError(dynamic error, StackTrace stackTrace) {
+    print('Error en build: $error');
+    print('StackTrace: $stackTrace');
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Error')),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error, size: 64, color: Colors.red),
+            const SizedBox(height: 16),
+            const Text('Ha ocurrido un error'),
+            const SizedBox(height: 8),
+            Text('$error'),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Volver'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   /** Construye la vista principal del formulario con todos los campos */
@@ -752,85 +816,20 @@ class _CrearPistaViewState extends State<CrearPistaView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Mapa pequeño con botón para expandir
             _buildMapSection(),
             const SizedBox(height: 24),
-
-            _buildTextField(
-              controller: _nombreController,
-              label: 'Nombre',
-              hint: 'Nombre de la pista',
-              icon: Icons.sports_soccer,
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Por favor ingresa un nombre';
-                }
-                return null;
-              },
-            ),
+            _construirCampoNombre(),
             const SizedBox(height: 16),
-
-            _buildTextField(
-              controller: _direccionController,
-              label: 'Dirección',
-              hint: 'Dirección de la pista',
-              icon: Icons.location_on,
-              suffixIcon: IconButton(
-                icon: _cargandoUbicacion
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.search),
-                onPressed: _cargandoUbicacion
-                    ? null
-                    : () => _buscarDireccion(_direccionController.text),
-              ),
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Por favor ingresa una dirección';
-                }
-                return null;
-              },
-            ),
+            _construirCampoDireccion(),
             const SizedBox(height: 16),
-
-            // Selector múltiple de tipos
             _buildTipoSelector(),
             const SizedBox(height: 16),
-
-            _buildTextField(
-              controller: _descripcionController,
-              label: 'Descripción',
-              hint: 'Descripción de la pista',
-              icon: Icons.description,
-              maxLines: 3,
-            ),
+            _construirCampoDescripcion(),
             const SizedBox(height: 16),
-
-            _buildTextField(
-              controller: _precioController,
-              label: 'Precio (€)',
-              hint: 'Ej: 25.0',
-              icon: Icons.euro,
-              keyboardType: TextInputType.number,
-              validator: (value) {
-                if (value != null && value.trim().isNotEmpty) {
-                  if (double.tryParse(value.trim()) == null) {
-                    return 'Precio inválido';
-                  }
-                }
-                return null;
-              },
-            ),
+            _construirCampoPrecio(),
             const SizedBox(height: 16),
-
-            // Campo para URL de imagen
             _buildImageUrlField(),
             const SizedBox(height: 16),
-
-            // Switch para disponibilidad
             _buildAvailabilitySwitch(),
             const SizedBox(height: 100),
           ],
@@ -839,127 +838,215 @@ class _CrearPistaViewState extends State<CrearPistaView> {
     );
   }
 
-  /** Construye la sección del mapa con controles integrados */
+  /** Construye el campo de nombre con validación obligatoria */
+  Widget _construirCampoNombre() {
+    return _buildTextField(
+      controller: _nombreController,
+      label: 'Nombre',
+      hint: 'Nombre de la pista',
+      icon: Icons.sports_soccer,
+      validator: (value) {
+        if (value == null || value.trim().isEmpty) {
+          return 'Por favor ingresa un nombre';
+        }
+        return null;
+      },
+    );
+  }
+
+  /** Construye el campo de dirección (solo lectura, se actualiza automáticamente) */
+  Widget _construirCampoDireccion() {
+    return _buildTextField(
+      controller: _direccionController,
+      label: 'Dirección',
+      hint: 'Se actualizará automáticamente al seleccionar ubicación',
+      icon: Icons.location_on,
+      readOnly: true,
+      validator: (value) {
+        if (value == null || value.trim().isEmpty) {
+          return 'Por favor selecciona una ubicación en el mapa';
+        }
+        return null;
+      },
+    );
+  }
+
+  /** Construye el campo de descripción (opcional) */
+  Widget _construirCampoDescripcion() {
+    return _buildTextField(
+      controller: _descripcionController,
+      label: 'Descripción',
+      hint: 'Descripción de la pista',
+      icon: Icons.description,
+      maxLines: 3,
+    );
+  }
+
+  /** Construye el campo de precio con validación numérica */
+  Widget _construirCampoPrecio() {
+    return _buildTextField(
+      controller: _precioController,
+      label: 'Precio (€)',
+      hint: 'Ej: 25.0',
+      icon: Icons.euro,
+      keyboardType: TextInputType.number,
+      validator: (value) {
+        if (value != null && value.trim().isNotEmpty) {
+          if (double.tryParse(value.trim()) == null) {
+            return 'Precio inválido';
+          }
+        }
+        return null;
+      },
+    );
+  }
+
+  /** Construye la sección del mapa con controles integrados.
+   * Incluye el mapa interactivo, botones para pantalla completa y ubicación actual,
+   * y información de coordenadas en la parte inferior.
+   */
   Widget _buildMapSection() {
     return Container(
-      height: 200,
+      height: 250,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(15),
         border: Border.all(color: Colors.blue[200]!),
       ),
       child: Column(
         children: [
-          // Header del mapa con botón expandir
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.blue[50],
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(15),
-                topRight: Radius.circular(15),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.location_on, color: Colors.blue[700]),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text(
-                    'Ubicación de la pista',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-                // Botón para expandir mapa
-                ElevatedButton.icon(
-                  onPressed: _abrirSelectorMapa,
-                  icon: const Icon(Icons.fullscreen, size: 18),
-                  label: const Text('Seleccionar en mapa'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    textStyle: const TextStyle(fontSize: 12),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: _cargandoUbicacion
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.my_location),
-                  onPressed:
-                      _cargandoUbicacion ? null : _obtenerUbicacionActual,
-                  tooltip: 'Mi ubicación',
-                ),
-              ],
-            ),
-          ),
-          // Mapa pequeño
-          Expanded(
-            child: ClipRRect(
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(15),
-                bottomRight: Radius.circular(15),
-              ),
-              child: GoogleMap(
-                initialCameraPosition: CameraPosition(
-                  target: LatLng(_latitud ?? 40.416775, _longitud ?? -3.703790),
-                  zoom: 13,
-                ),
-                markers: _markers,
-                onTap: _onMapTap,
-                onMapCreated: (GoogleMapController controller) {
-                  _mapController = controller;
-                },
-                myLocationEnabled: true,
-                myLocationButtonEnabled: false,
-                zoomControlsEnabled: false,
-                mapType: MapType.normal,
-                scrollGesturesEnabled: true,
-                zoomGesturesEnabled: true,
-              ),
-            ),
-          ),
-          // Info de coordenadas
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(15),
-                bottomRight: Radius.circular(15),
-              ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    _ubicacionTexto,
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                ),
-                if (_latitud != null && _longitud != null)
-                  Icon(
-                    Icons.check_circle,
-                    color: Colors.green,
-                    size: 16,
-                  ),
-              ],
-            ),
-          ),
+          _construirHeaderMapa(),
+          _construirMapaInteractivo(),
+          _construirInfoUbicacion(),
         ],
       ),
     );
   }
 
-  /** Construye el selector múltiple de tipos de pista */
+  /** Construye el header del mapa con controles de navegación */
+  Widget _construirHeaderMapa() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.blue[50],
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(15),
+          topRight: Radius.circular(15),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.location_on, color: Colors.blue[700]),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'Toca en el mapa para seleccionar ubicación',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ),
+          _construirBotonMapaCompleto(),
+          const SizedBox(width: 8),
+          _construirBotonMiUbicacion(),
+        ],
+      ),
+    );
+  }
+
+  /** Construye el botón para abrir el mapa en pantalla completa */
+  Widget _construirBotonMapaCompleto() {
+    return ElevatedButton.icon(
+      onPressed: _abrirSelectorMapa,
+      icon: const Icon(Icons.fullscreen, size: 18),
+      label: const Text('Mapa completo'),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.blue,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        textStyle: const TextStyle(fontSize: 12),
+      ),
+    );
+  }
+
+  /** Construye el botón para obtener la ubicación actual del usuario */
+  Widget _construirBotonMiUbicacion() {
+    return IconButton(
+      icon: _cargandoUbicacion
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.my_location),
+      onPressed: _cargandoUbicacion ? null : _obtenerUbicacionActual,
+      tooltip: 'Mi ubicación',
+    );
+  }
+
+  /** Construye el mapa interactivo de Google Maps */
+  Widget _construirMapaInteractivo() {
+    return Expanded(
+      child: ClipRRect(
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(15),
+          bottomRight: Radius.circular(15),
+        ),
+        child: GoogleMap(
+          initialCameraPosition: CameraPosition(
+            target: LatLng(_latitud ?? 40.416775, _longitud ?? -3.703790),
+            zoom: 13,
+          ),
+          markers: _markers,
+          onTap: _onMapTap,
+          onMapCreated: (GoogleMapController controller) {
+            _mapController = controller;
+          },
+          myLocationEnabled: true,
+          myLocationButtonEnabled: false,
+          zoomControlsEnabled: true,
+          mapType: MapType.normal,
+          scrollGesturesEnabled: true,
+          zoomGesturesEnabled: true,
+        ),
+      ),
+    );
+  }
+
+  /** Construye la información de ubicación en la parte inferior del mapa */
+  Widget _construirInfoUbicacion() {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(15),
+          bottomRight: Radius.circular(15),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              _ubicacionTexto,
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ),
+          if (_latitud != null && _longitud != null)
+            const Icon(
+              Icons.check_circle,
+              color: Colors.green,
+              size: 16,
+            ),
+        ],
+      ),
+    );
+  }
+
+  /** Construye el selector múltiple de tipos de pista.
+   * Permite seleccionar uno o más tipos de pista de una lista predefinida,
+   * mostrando chips para los tipos seleccionados y checkboxes para los disponibles.
+   */
   Widget _buildTipoSelector() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -982,53 +1069,14 @@ class _CrearPistaViewState extends State<CrearPistaView> {
           child: Column(
             children: [
               if (_tiposSeleccionados.isNotEmpty) ...[
-                // Mostrar tipos seleccionados como chips
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 4,
-                  children: _tiposSeleccionados.map((tipo) {
-                    return Chip(
-                      label: Text(tipo),
-                      backgroundColor: Colors.green[100],
-                      deleteIcon: const Icon(Icons.close, size: 18),
-                      onDeleted: () {
-                        setState(() {
-                          _tiposSeleccionados.remove(tipo);
-                        });
-                      },
-                    );
-                  }).toList(),
-                ),
+                _construirChipsTiposSeleccionados(),
                 const SizedBox(height: 12),
                 const Divider(),
                 const SizedBox(height: 8),
               ],
-              // Lista de tipos disponibles
-              ...(_tiposDisponibles
-                  .where((tipo) => !_tiposSeleccionados.contains(tipo))
-                  .map((tipo) {
-                return CheckboxListTile(
-                  title: Text(tipo),
-                  value: false,
-                  onChanged: (bool? value) {
-                    if (value == true) {
-                      setState(() {
-                        _tiposSeleccionados.add(tipo);
-                      });
-                    }
-                  },
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                );
-              }).toList()),
+              ..._construirListaTiposDisponibles(),
               if (_tiposSeleccionados.length == _tiposDisponibles.length)
-                const Text(
-                  'Todos los tipos seleccionados',
-                  style: TextStyle(
-                    color: Colors.green,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
+                _construirMensajeTodosSeleccionados(),
             ],
           ),
         ),
@@ -1036,7 +1084,62 @@ class _CrearPistaViewState extends State<CrearPistaView> {
     );
   }
 
-/** Construye el campo de URL de imagen con previsualización */
+  /** Construye los chips de tipos seleccionados con opción de eliminar */
+  Widget _construirChipsTiposSeleccionados() {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      children: _tiposSeleccionados.map((tipo) {
+        return Chip(
+          label: Text(tipo),
+          backgroundColor: Colors.green[100],
+          deleteIcon: const Icon(Icons.close, size: 18),
+          onDeleted: () {
+            setState(() {
+              _tiposSeleccionados.remove(tipo);
+            });
+          },
+        );
+      }).toList(),
+    );
+  }
+
+  /** Construye la lista de tipos disponibles como checkboxes */
+  List<Widget> _construirListaTiposDisponibles() {
+    return _tiposDisponibles
+        .where((tipo) => !_tiposSeleccionados.contains(tipo))
+        .map((tipo) {
+      return CheckboxListTile(
+        title: Text(tipo),
+        value: false,
+        onChanged: (bool? value) {
+          if (value == true) {
+            setState(() {
+              _tiposSeleccionados.add(tipo);
+            });
+          }
+        },
+        dense: true,
+        contentPadding: EdgeInsets.zero,
+      );
+    }).toList();
+  }
+
+  /** Construye el mensaje cuando todos los tipos están seleccionados */
+  Widget _construirMensajeTodosSeleccionados() {
+    return const Text(
+      'Todos los tipos seleccionados',
+      style: TextStyle(
+        color: Colors.green,
+        fontStyle: FontStyle.italic,
+      ),
+    );
+  }
+
+  /** Construye el campo de URL de imagen con previsualización.
+   * Incluye validación de URL, botones de refrescar y previsualizar,
+   * y una vista previa automática de la imagen cuando la URL es válida.
+   */
   Widget _buildImageUrlField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1049,59 +1152,7 @@ class _CrearPistaViewState extends State<CrearPistaView> {
           ),
         ),
         const SizedBox(height: 8),
-        TextFormField(
-          controller: _imagenUrlController,
-          decoration: InputDecoration(
-            hintText: 'https://ejemplo.com/imagen.jpg',
-            prefixIcon: const Icon(Icons.image),
-            suffixIcon: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_imagenUrlController.text.trim().isNotEmpty) ...[
-                  IconButton(
-                    icon: const Icon(Icons.refresh),
-                    onPressed: () {
-                      setState(() {
-                        // Forzar reconstrucción de la previsualización
-                      });
-                    },
-                    tooltip: 'Refrescar imagen',
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.preview),
-                    onPressed: _previsualizarImagen,
-                    tooltip: 'Previsualizar imagen',
-                  ),
-                ],
-              ],
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            filled: true,
-            fillColor: Colors.white,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 12,
-            ),
-          ),
-          keyboardType: TextInputType.url,
-          onChanged: (value) {
-            // Forzar actualización del estado para mostrar/ocultar previsualización
-            setState(() {
-              print('URL de imagen cambiada: $value');
-            });
-          },
-          validator: (value) {
-            if (value != null && value.trim().isNotEmpty) {
-              if (!_esUrlValida(value.trim())) {
-                return 'URL inválida. Debe comenzar con http:// o https://';
-              }
-            }
-            return null;
-          },
-        ),
-        // Mostrar previsualización de la imagen si hay URL
+        _construirCampoUrlImagen(),
         if (_imagenUrlController.text.trim().isNotEmpty) ...[
           const SizedBox(height: 12),
           _buildImagePreview(),
@@ -1110,7 +1161,67 @@ class _CrearPistaViewState extends State<CrearPistaView> {
     );
   }
 
-/** Construye una previsualización de la imagen con controles */
+  /** Construye el campo de texto para la URL de imagen */
+  Widget _construirCampoUrlImagen() {
+    return TextFormField(
+      controller: _imagenUrlController,
+      decoration: InputDecoration(
+        hintText: 'https://ejemplo.com/imagen.jpg',
+        prefixIcon: const Icon(Icons.image),
+        suffixIcon: _construirBotonesUrlImagen(),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
+        ),
+      ),
+      keyboardType: TextInputType.url,
+      onChanged: (value) {
+        setState(() {
+          print('URL de imagen cambiada: $value');
+        });
+      },
+      validator: (value) {
+        if (value != null && value.trim().isNotEmpty) {
+          if (!_esUrlValida(value.trim())) {
+            return 'URL inválida. Debe comenzar con http:// o https://';
+          }
+        }
+        return null;
+      },
+    );
+  }
+
+  /** Construye los botones de acción para el campo URL (refrescar y previsualizar) */
+  Widget? _construirBotonesUrlImagen() {
+    if (_imagenUrlController.text.trim().isEmpty) {
+      return null;
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          icon: const Icon(Icons.refresh),
+          onPressed: () {
+            setState(() {});
+          },
+          tooltip: 'Refrescar imagen',
+        ),
+        IconButton(
+          icon: const Icon(Icons.preview),
+          onPressed: _previsualizarImagen,
+          tooltip: 'Previsualizar imagen',
+        ),
+      ],
+    );
+  }
+
+  /** Construye la previsualización de la imagen con manejo de estados */
   Widget _buildImagePreview() {
     final url = _imagenUrlController.text.trim();
     if (url.isEmpty) return const SizedBox.shrink();
@@ -1126,133 +1237,149 @@ class _CrearPistaViewState extends State<CrearPistaView> {
         borderRadius: BorderRadius.circular(8),
         child: Stack(
           children: [
-            // Imagen principal
-            SizedBox(
-              width: double.infinity,
-              height: double.infinity,
-              child: Image.network(
-                url,
-                fit: BoxFit.cover,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Container(
-                    color: Colors.grey[100],
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          CircularProgressIndicator(
-                            value: loadingProgress.expectedTotalBytes != null
-                                ? loadingProgress.cumulativeBytesLoaded /
-                                    loadingProgress.expectedTotalBytes!
-                                : null,
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Cargando imagen...',
-                            style: TextStyle(fontSize: 12, color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) {
-                  print('Error cargando imagen: $error');
-                  return Container(
-                    color: Colors.grey[100],
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.error, color: Colors.red, size: 32),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Error al cargar imagen',
-                          style: TextStyle(color: Colors.red, fontSize: 12),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Verifica que la URL sea correcta',
-                          style:
-                              TextStyle(color: Colors.grey[600], fontSize: 10),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 8),
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            setState(() {
-                              // Forzar recarga de la imagen
-                            });
-                          },
-                          icon: const Icon(Icons.refresh, size: 16),
-                          label: const Text('Reintentar'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            textStyle: const TextStyle(fontSize: 10),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
+            _construirImagenPreview(url),
+            _construirOverlayImagen(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /** Construye la imagen de previsualización con manejo de carga y errores */
+  Widget _construirImagenPreview(String url) {
+    return SizedBox(
+      width: double.infinity,
+      height: double.infinity,
+      child: Image.network(
+        url,
+        fit: BoxFit.cover,
+        loadingBuilder: _construirIndicadorCarga,
+        errorBuilder: (context, error, stackTrace) => _construirErrorImagenPreview(),
+      ),
+    );
+  }
+
+  /** Construye el indicador de carga para la imagen */
+  Widget _construirIndicadorCarga(BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
+    if (loadingProgress == null) return child;
+    return Container(
+      color: Colors.grey[100],
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(
+              value: loadingProgress.expectedTotalBytes != null
+                  ? loadingProgress.cumulativeBytesLoaded /
+                      loadingProgress.expectedTotalBytes!
+                  : null,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Cargando imagen...',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /** Construye el widget de error para la previsualización de imagen */
+  Widget _construirErrorImagenPreview() {
+    print('Error cargando imagen');
+    return Container(
+      color: Colors.grey[100],
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.error, color: Colors.red, size: 32),
+          const SizedBox(height: 8),
+          const Text(
+            'Error al cargar imagen',
+            style: TextStyle(color: Colors.red, fontSize: 12),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Verifica que la URL sea correcta',
+            style: TextStyle(color: Colors.grey[600], fontSize: 10),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          _construirBotonReintentar(),
+        ],
+      ),
+    );
+  }
+
+  /** Construye el botón de reintentar para cargar la imagen */
+  Widget _construirBotonReintentar() {
+    return ElevatedButton.icon(
+      onPressed: () {
+        setState(() {});
+      },
+      icon: const Icon(Icons.refresh, size: 16),
+      label: const Text('Reintentar'),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.blue,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 6,
+        ),
+        textStyle: const TextStyle(fontSize: 10),
+      ),
+    );
+  }
+
+  /** Construye el overlay de información sobre la imagen cargada */
+  Widget _construirOverlayImagen() {
+    return Positioned(
+      bottom: 0,
+      left: 0,
+      right: 0,
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.bottomCenter,
+            end: Alignment.topCenter,
+            colors: [
+              Colors.black.withAlpha(178),
+              Colors.transparent,
+            ],
+          ),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.check_circle,
+              color: Colors.green,
+              size: 16,
+            ),
+            const SizedBox(width: 4),
+            const Expanded(
+              child: Text(
+                'Imagen cargada correctamente',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
-            // Overlay con información
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [
-                      Colors.black.withAlpha(178),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.check_circle,
-                      color: Colors.green,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 4),
-                    const Expanded(
-                      child: Text(
-                        'Imagen cargada correctamente',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: _previsualizarImagen,
-                      icon: const Icon(
-                        Icons.fullscreen,
-                        color: Colors.white,
-                        size: 16,
-                      ),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(
-                        minWidth: 24,
-                        minHeight: 24,
-                      ),
-                    ),
-                  ],
-                ),
+            IconButton(
+              onPressed: _previsualizarImagen,
+              icon: const Icon(
+                Icons.fullscreen,
+                color: Colors.white,
+                size: 16,
+              ),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(
+                minWidth: 24,
+                minHeight: 24,
               ),
             ),
           ],
@@ -1285,7 +1412,10 @@ class _CrearPistaViewState extends State<CrearPistaView> {
     );
   }
 
-  /** Construye la barra inferior con el botón de guardar */
+  /** Construye la barra inferior con el botón de guardar.
+   * Incluye indicador de carga y texto dinámico según el estado
+   * de la operación (crear/actualizar).
+   */
   Widget _buildBottomBar() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1310,45 +1440,56 @@ class _CrearPistaViewState extends State<CrearPistaView> {
               borderRadius: BorderRadius.circular(10),
             ),
           ),
-          child: _isLoading
-              ? const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    ),
-                    SizedBox(width: 8),
-                    Text('Guardando...'),
-                  ],
-                )
-              : Text(
-                  widget.pistaExistente != null
-                      ? 'ACTUALIZAR PISTA'
-                      : 'GUARDAR PISTA',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+          child: _isLoading ? _construirIndicadorGuardando() : _construirTextoBoton(),
         ),
       ),
     );
   }
 
-  /** Construye un campo de texto con estilo personalizado.
-   * @param controller Controlador del campo
+  /** Construye el indicador de carga durante el guardado */
+  Widget _construirIndicadorGuardando() {
+    return const Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+          ),
+        ),
+        SizedBox(width: 8),
+        Text('Guardando...'),
+      ],
+    );
+  }
+
+  /** Construye el texto del botón según el modo (crear/actualizar) */
+  Widget _construirTextoBoton() {
+    return Text(
+      widget.pistaExistente != null
+          ? 'ACTUALIZAR PISTA'
+          : 'GUARDAR PISTA',
+      style: const TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.bold,
+      ),
+    );
+  }
+
+  /** Construye un campo de texto personalizado reutilizable.
+   * Proporciona un diseño consistente para todos los campos del formulario
+   * con validación, iconos y estilos personalizables.
+   * @param controller Controlador del campo de texto
    * @param label Etiqueta del campo
    * @param hint Texto de ayuda
-   * @param icon Icono del campo
-   * @param suffixIcon Icono al final del campo
+   * @param icon Icono a mostrar
+   * @param suffixIcon Icono adicional al final (opcional)
    * @param maxLines Número máximo de líneas
    * @param keyboardType Tipo de teclado
    * @param validator Función de validación
+   * @param readOnly Si el campo es de solo lectura
    */
   Widget _buildTextField({
     required TextEditingController controller,
@@ -1359,6 +1500,7 @@ class _CrearPistaViewState extends State<CrearPistaView> {
     int maxLines = 1,
     TextInputType keyboardType = TextInputType.text,
     String? Function(String?)? validator,
+    bool readOnly = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1373,6 +1515,7 @@ class _CrearPistaViewState extends State<CrearPistaView> {
         const SizedBox(height: 8),
         TextFormField(
           controller: controller,
+          readOnly: readOnly,
           decoration: InputDecoration(
             hintText: hint,
             prefixIcon: Icon(icon),
@@ -1381,7 +1524,7 @@ class _CrearPistaViewState extends State<CrearPistaView> {
               borderRadius: BorderRadius.circular(10),
             ),
             filled: true,
-            fillColor: Colors.white,
+            fillColor: readOnly ? Colors.grey[100] : Colors.white,
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 12,
