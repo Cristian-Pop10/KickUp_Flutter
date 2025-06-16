@@ -18,12 +18,20 @@ class PasarelaPagoView extends StatefulWidget {
   
   /** Información del partido */
   final PartidoModel partido;
+  
+  /** Función personalizada para procesar el pago (opcional) */
+  final Future<void> Function()? customProcessPayment;
+  
+  /** Información extra para mostrar en la UI (opcional) */
+  final String? extraInfo;
 
   const PasarelaPagoView({
     Key? key,
     required this.partidoId,
     required this.userId,
     required this.partido,
+    this.customProcessPayment,
+    this.extraInfo,
   }) : super(key: key);
 
   @override
@@ -71,6 +79,14 @@ class _PasarelaPagoViewState extends State<PasarelaPagoView>
       'icono': Icons.apple,
       'color': Colors.black,
     },
+    {
+      'id': 'googlepay',
+      'tipo': 'Google Pay',
+      'numero': '',
+      'expiracion': 'Verified',
+      'icono': Icons.account_balance_wallet,
+      'color': Colors.green,
+    },
   ];
 
   @override
@@ -109,6 +125,7 @@ class _PasarelaPagoViewState extends State<PasarelaPagoView>
 
   /** Procesa el pago e inscribe al usuario al partido.
    * Simula un proceso de pago y luego procede con la inscripción real.
+   * Puede usar una función personalizada si se proporciona.
    */
   Future<void> _procesarPago() async {
     if (_procesandoPago) return;
@@ -118,6 +135,13 @@ class _PasarelaPagoViewState extends State<PasarelaPagoView>
     });
 
     try {
+      // Si hay una función personalizada, usarla en lugar del proceso estándar
+      if (widget.customProcessPayment != null) {
+        await widget.customProcessPayment!();
+        return;
+      }
+
+      // Proceso estándar para un solo usuario
       // Mostrar progreso de pago
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -209,7 +233,7 @@ class _PasarelaPagoViewState extends State<PasarelaPagoView>
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Añadir $tipo'),
-        content: Text('Esta funcionalidad estará disponible próximamente.\n\nPor ahora puedes usar los métodos de pago guardados.'),
+        content: const Text('Esta funcionalidad estará disponible próximamente.\n\nPor ahora puedes usar los métodos de pago guardados.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -217,6 +241,14 @@ class _PasarelaPagoViewState extends State<PasarelaPagoView>
           ),
         ],
       ),
+    );
+  }
+
+  /** Obtiene el método de pago seleccionado */
+  Map<String, dynamic> get _metodoSeleccionadoData {
+    return _metodosPago.firstWhere(
+      (metodo) => metodo['id'] == _metodoSeleccionado,
+      orElse: () => _metodosPago.first,
     );
   }
 
@@ -232,7 +264,7 @@ class _PasarelaPagoViewState extends State<PasarelaPagoView>
   /** Construye el AppBar personalizado */
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      backgroundColor: const Color.fromARGB(0, 159, 51, 51),
+      backgroundColor: Colors.transparent,
       elevation: 0,
       leading: IconButton(
         icon: Icon(
@@ -262,7 +294,7 @@ class _PasarelaPagoViewState extends State<PasarelaPagoView>
           Container(
             padding: const EdgeInsets.all(30),
             decoration: BoxDecoration(
-              color: AppColors.cardBackground(context),
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
@@ -277,12 +309,13 @@ class _PasarelaPagoViewState extends State<PasarelaPagoView>
                 const CircularProgressIndicator(),
                 const SizedBox(height: 20),
                 Text(
-                  'Procesando pago...',
+                  widget.extraInfo ?? 'Procesando pago...',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                     color: Theme.of(context).textTheme.bodyLarge?.color,
                   ),
+                  textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -313,6 +346,13 @@ class _PasarelaPagoViewState extends State<PasarelaPagoView>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 20),
+                // Mostrar información extra si está disponible
+                if (widget.extraInfo != null) ...[
+                  _buildInfoCard(),
+                  const SizedBox(height: 20),
+                ],
+                _buildResumenPartido(),
+                const SizedBox(height: 30),
                 _buildMetodosPagoSection(),
                 const SizedBox(height: 30),
                 _buildAnadirMetodoSection(),
@@ -325,6 +365,151 @@ class _PasarelaPagoViewState extends State<PasarelaPagoView>
         ),
       ),
     );
+  }
+
+  /** Construye la tarjeta de información extra */
+  Widget _buildInfoCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.blue.shade200),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade100,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              Icons.info_outline,
+              color: Colors.blue.shade700,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              widget.extraInfo!,
+              style: TextStyle(
+                color: Colors.blue.shade700,
+                fontWeight: FontWeight.w500,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /** Construye el resumen del partido */
+  Widget _buildResumenPartido() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(13),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary.withAlpha(25),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.sports_soccer,
+                  color: Theme.of(context).colorScheme.primary,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Resumen del Partido',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).textTheme.bodyLarge?.color,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          _buildResumenItem('Tipo', widget.partido.tipo, Icons.sports_soccer),
+          const SizedBox(height: 12),
+          _buildResumenItem('Lugar', widget.partido.lugar, Icons.location_on),
+          const SizedBox(height: 12),
+          _buildResumenItem(
+            'Fecha', 
+            _formatearFechaPartido(widget.partido.fecha), 
+            Icons.calendar_today
+          ),
+          const SizedBox(height: 12),
+          _buildResumenItem(
+            'Duración', 
+            '${widget.partido.duracion} minutos', 
+            Icons.timer
+          ),
+        ],
+      ),
+    );
+  }
+
+  /** Construye un item del resumen */
+  Widget _buildResumenItem(String titulo, String valor, IconData icono) {
+    return Row(
+      children: [
+        Icon(
+          icono,
+          color: Colors.grey[600],
+          size: 18,
+        ),
+        const SizedBox(width: 12),
+        Text(
+          '$titulo: ',
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey[600],
+          ),
+        ),
+        Expanded(
+          child: Text(
+            valor,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).textTheme.bodyLarge?.color,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /** Formatea la fecha del partido */
+  String _formatearFechaPartido(DateTime fecha) {
+    final dia = fecha.day.toString().padLeft(2, '0');
+    final mes = fecha.month.toString().padLeft(2, '0');
+    final anio = fecha.year;
+    final hora = fecha.hour.toString().padLeft(2, '0');
+    final minuto = fecha.minute.toString().padLeft(2, '0');
+    
+    return '$dia/$mes/$anio - $hora:$minuto';
   }
 
   /** Construye la sección de métodos de pago guardados */
@@ -345,13 +530,30 @@ class _PasarelaPagoViewState extends State<PasarelaPagoView>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Método de pago',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).textTheme.bodyLarge?.color,
-            ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary.withAlpha(25),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.payment,
+                  color: Theme.of(context).colorScheme.primary,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Método de pago',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).textTheme.bodyLarge?.color,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 20),
           ...(_metodosPago.map((metodo) => _buildMetodoPagoTile(metodo)).toList()),
@@ -373,7 +575,8 @@ class _PasarelaPagoViewState extends State<PasarelaPagoView>
           });
         },
         borderRadius: BorderRadius.circular(12),
-        child: Container(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: isSelected 
@@ -383,14 +586,15 @@ class _PasarelaPagoViewState extends State<PasarelaPagoView>
             border: Border.all(
               color: isSelected 
                   ? Theme.of(context).colorScheme.primary
-                  : Colors.transparent,
+                  : Colors.grey.shade300,
               width: 2,
             ),
           ),
           child: Row(
             children: [
-              // Checkbox personalizado
-              Container(
+              // Radio button personalizado
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
                 width: 24,
                 height: 24,
                 decoration: BoxDecoration(
@@ -400,10 +604,10 @@ class _PasarelaPagoViewState extends State<PasarelaPagoView>
                   border: Border.all(
                     color: isSelected 
                         ? Theme.of(context).colorScheme.primary
-                        : Colors.grey,
+                        : Colors.grey.shade400,
                     width: 2,
                   ),
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: isSelected
                     ? const Icon(
@@ -417,16 +621,16 @@ class _PasarelaPagoViewState extends State<PasarelaPagoView>
               
               // Icono del método de pago
               Container(
-                width: 40,
-                height: 40,
+                width: 45,
+                height: 45,
                 decoration: BoxDecoration(
                   color: metodo['color'].withAlpha(25),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
                   metodo['icono'],
                   color: metodo['color'],
-                  size: 20,
+                  size: 22,
                 ),
               ),
               const SizedBox(width: 16),
@@ -437,17 +641,20 @@ class _PasarelaPagoViewState extends State<PasarelaPagoView>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${metodo['tipo']}${metodo['numero']}',
+                      '${metodo['tipo']} ${metodo['numero']}',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: Theme.of(context).textTheme.bodyLarge?.color,
+                        color: isSelected
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).textTheme.bodyLarge?.color,
                       ),
                     ),
+                    const SizedBox(height: 2),
                     Text(
                       metodo['expiracion'],
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: 13,
                         color: Colors.grey[600],
                       ),
                     ),
@@ -457,10 +664,20 @@ class _PasarelaPagoViewState extends State<PasarelaPagoView>
               
               // Indicador de selección
               if (isSelected)
-                Icon(
-                  Icons.check_circle,
-                  color: Theme.of(context).colorScheme.primary,
-                  size: 24,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    'Seleccionado',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
             ],
           ),
@@ -487,25 +704,51 @@ class _PasarelaPagoViewState extends State<PasarelaPagoView>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Añadir nuevo método de pago',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).textTheme.bodyLarge?.color,
-            ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.green.withAlpha(25),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.add_card,
+                  color: Colors.green,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Añadir nuevo método',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).textTheme.bodyLarge?.color,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 20),
           _buildAnadirMetodoTile(
-            'Credit/Debit Card',
+            'Tarjeta de Crédito/Débito',
             Icons.credit_card,
+            Colors.blue,
             () => _mostrarAnadirMetodoPago('tarjeta'),
           ),
           const SizedBox(height: 12),
           _buildAnadirMetodoTile(
             'PayPal',
             Icons.account_balance_wallet,
+            Colors.indigo,
             () => _mostrarAnadirMetodoPago('PayPal'),
+          ),
+          const SizedBox(height: 12),
+          _buildAnadirMetodoTile(
+            'Transferencia Bancaria',
+            Icons.account_balance,
+            Colors.teal,
+            () => _mostrarAnadirMetodoPago('transferencia'),
           ),
         ],
       ),
@@ -513,7 +756,7 @@ class _PasarelaPagoViewState extends State<PasarelaPagoView>
   }
 
   /** Construye un tile para añadir método de pago */
-  Widget _buildAnadirMetodoTile(String titulo, IconData icono, VoidCallback onTap) {
+  Widget _buildAnadirMetodoTile(String titulo, IconData icono, Color color, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -522,6 +765,7 @@ class _PasarelaPagoViewState extends State<PasarelaPagoView>
         decoration: BoxDecoration(
           color: AppColors.fieldBackground(context),
           borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade200),
         ),
         child: Row(
           children: [
@@ -529,12 +773,12 @@ class _PasarelaPagoViewState extends State<PasarelaPagoView>
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary.withAlpha(25),
+                color: color.withAlpha(25),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
                 icono,
-                color: Theme.of(context).colorScheme.primary,
+                color: color,
                 size: 20,
               ),
             ),
@@ -543,7 +787,7 @@ class _PasarelaPagoViewState extends State<PasarelaPagoView>
               child: Text(
                 titulo,
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 15,
                   fontWeight: FontWeight.w600,
                   color: Theme.of(context).textTheme.bodyLarge?.color,
                 ),
@@ -578,78 +822,149 @@ class _PasarelaPagoViewState extends State<PasarelaPagoView>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Detalles del Pago',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).textTheme.bodyLarge?.color,
-            ),
-          ),
-          const SizedBox(height: 20),
-          
-          // Detalle del precio
           Row(
             children: [
               Container(
-                width: 50,
-                height: 50,
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppColors.adaptiveBeige(context),
-                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.orange.withAlpha(25),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(
-                  Icons.sports_soccer,
-                  color: Theme.of(context).colorScheme.primary,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Cuota del Partido',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Theme.of(context).textTheme.bodyLarge?.color,
-                      ),
-                    ),
-                    Text(
-                      '${widget.partido.precio.toStringAsFixed(2)}€',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
+                child: const Icon(
+                  Icons.receipt_long,
+                  color: Colors.orange,
+                  size: 20,
                 ),
               ),
-              
-              // Botón de pagar
-              ElevatedButton(
-                onPressed: _procesarPago,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                ),
-                child: const Text(
-                  'Pagar',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+              const SizedBox(width: 12),
+              Text(
+                'Detalles del Pago',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).textTheme.bodyLarge?.color,
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 20),
+          
+          // Desglose del precio
+          _buildPriceBreakdown(),
+          
+          const SizedBox(height: 20),
+          const Divider(),
+          const SizedBox(height: 20),
+          
+          // Botón de pagar
+          _buildPayButton(),
         ],
+      ),
+    );
+  }
+
+  /** Construye el desglose de precios */
+  Widget _buildPriceBreakdown() {
+    final precio = widget.partido.precio;
+    final iva = precio * 0.21; // 21% IVA
+    final total = precio + iva;
+
+    return Column(
+      children: [
+        _buildPriceRow('Cuota del partido', '${precio.toStringAsFixed(2)}€'),
+        const SizedBox(height: 8),
+        _buildPriceRow('IVA (21%)', '${iva.toStringAsFixed(2)}€'),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primary.withAlpha(25),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Total a pagar',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+              Text(
+                '${total.toStringAsFixed(2)}€',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /** Construye una fila de precio */
+  Widget _buildPriceRow(String concepto, String precio) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          concepto,
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey[600],
+          ),
+        ),
+        Text(
+          precio,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Theme.of(context).textTheme.bodyLarge?.color,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /** Construye el botón de pagar */
+  Widget _buildPayButton() {
+    final metodoSeleccionado = _metodoSeleccionadoData;
+    
+    return SizedBox(
+      width: double.infinity,
+      height: 55,
+      child: ElevatedButton(
+        onPressed: _procesarPago,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(30),
+          ),
+          elevation: 3,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              metodoSeleccionado['icono'],
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Pagar con ${metodoSeleccionado['tipo']}',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

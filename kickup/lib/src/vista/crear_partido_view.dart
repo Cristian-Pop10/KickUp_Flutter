@@ -8,8 +8,8 @@ import '../modelo/pista_model.dart';
 
 /** Vista para crear un nuevo partido.
  * Permite al usuario ingresar información del partido como tipo, precio,
- * nombre, número de jugadores, fecha, hora y pista. Incluye selectores
- * personalizados, validación de formulario y cálculo automático de precios.
+ * nombre, fecha, hora y pista. El número de jugadores se establece automáticamente
+ * según el tipo de partido seleccionado, incluyendo al creador.
  */
 class CrearPartidoView extends StatefulWidget {
   /** ID del usuario que está creando el partido */
@@ -32,7 +32,6 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
 
   // Controladores para los campos de texto
   final TextEditingController _nombreController = TextEditingController();
-  final TextEditingController _integrantesController = TextEditingController();
   final TextEditingController _fechaController = TextEditingController();
   final TextEditingController _horaController = TextEditingController();
   final TextEditingController _precioController = TextEditingController();
@@ -50,29 +49,29 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
   /** Lista de tipos de partido disponibles con sus metadatos */
   final List<Map<String, dynamic>> _tiposPartido = [
     {
-      'nombre': 'Fútbol Sala',
+      'nombre': 'Fútbol 5',
       'icono': Icons.sports_soccer,
       'jugadores': '5 vs 5',
       'color': Colors.purple,
-      'maxIntegrantes': 10,
+      'totalJugadores': 10, 
     },
     {
       'nombre': 'Fútbol 7',
       'icono': Icons.sports_soccer,
       'jugadores': '7 vs 7',
       'color': Colors.green,
-      'maxIntegrantes': 14,
+      'totalJugadores': 14, 
     },
     {
       'nombre': 'Fútbol 11',
       'icono': Icons.sports_soccer,
       'jugadores': '11 vs 11',
       'color': Colors.orange,
-      'maxIntegrantes': 22,
+      'totalJugadores': 22, 
     },
   ];
 
-  String _tipoSeleccionado = 'Fútbol Sala';
+  String _tipoSeleccionado = 'Fútbol 5';
 
   // Controladores de animación
   late AnimationController _fadeController;
@@ -109,27 +108,20 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
     _cargarPistas();
   }
 
-  /** Actualiza el precio por persona basado en la pista seleccionada y el número de jugadores.
-   * Calcula dividiendo el precio total de la pista entre el número de jugadores.
+  /** Actualiza el precio por persona basado en la pista seleccionada y el número de jugadores automático.
+   * Calcula dividiendo el precio total de la pista entre el número total de jugadores del tipo seleccionado.
    */
   void _actualizarPrecioPorPersona() {
     if (_pistaSeleccionada?.precio != null) {
-      final maxJugadores = _tipoPartidoSeleccionado['maxIntegrantes'];
-      final numJugadores =
-          int.tryParse(_integrantesController.text) ?? maxJugadores;
-
-      if (numJugadores > 0) {
-        final precioPorPersona =
-            (_pistaSeleccionada!.precio! / numJugadores).toStringAsFixed(2);
-        _precioController.text = precioPorPersona;
-      }
+      final totalJugadores = _tipoPartidoSeleccionado['totalJugadores'];
+      final precioPorPersona = (_pistaSeleccionada!.precio! / totalJugadores).toStringAsFixed(2);
+      _precioController.text = precioPorPersona;
     }
   }
 
   @override
   void dispose() {
     _nombreController.dispose();
-    _integrantesController.dispose();
     _fechaController.dispose();
     _horaController.dispose();
     _precioController.dispose();
@@ -145,8 +137,7 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
     try {
       final pistas = await _pistaController.obtenerPistas();
       // Filtrar solo las pistas disponibles
-      final pistasDisponibles =
-          pistas.where((pista) => pista.disponible).toList();
+      final pistasDisponibles = pistas.where((pista) => pista.disponible).toList();
 
       if (mounted) {
         setState(() {
@@ -175,6 +166,16 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
       (tipo) => tipo['nombre'] == _tipoSeleccionado,
       orElse: () => _tiposPartido.first,
     );
+  }
+
+  /** Obtiene el número total de jugadores para el tipo de partido seleccionado */
+  int get _totalJugadores {
+    return _tipoPartidoSeleccionado['totalJugadores'];
+  }
+
+  /** Obtiene el número de jugadores que faltan (excluyendo al creador) */
+  int get _jugadoresFaltantes {
+    return _totalJugadores - 1; // -1 porque el creador ya está incluido
   }
 
   /** Muestra el selector de tipo de partido en un modal.
@@ -236,9 +237,7 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
                                 : Theme.of(context).cardColor,
                             borderRadius: BorderRadius.circular(15),
                             border: Border.all(
-                              color: isSelected
-                                  ? tipo['color']
-                                  : Colors.transparent,
+                              color: isSelected ? tipo['color'] : Colors.transparent,
                               width: 2,
                             ),
                             boxShadow: [
@@ -274,14 +273,11 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
                                 fontSize: 16,
                                 color: isSelected
                                     ? tipo['color']
-                                    : Theme.of(context)
-                                        .textTheme
-                                        .bodyLarge
-                                        ?.color,
+                                    : Theme.of(context).textTheme.bodyLarge?.color,
                               ),
                             ),
                             subtitle: Text(
-                              '${tipo['jugadores']} • Máx: ${tipo['maxIntegrantes']} jugadores',
+                              '${tipo['jugadores']} • Total: ${tipo['totalJugadores']} jugadores',
                               style: TextStyle(
                                 color: Colors.grey[600],
                                 fontSize: 14,
@@ -297,7 +293,7 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
                             onTap: () {
                               setState(() {
                                 _tipoSeleccionado = tipo['nombre'];
-                                // Actualizar precio si hay una pista seleccionada
+                                // Actualizar precio automáticamente
                                 _actualizarPrecioPorPersona();
                               });
                               Navigator.pop(context);
@@ -388,24 +384,18 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
                                 itemCount: _pistas.length,
                                 itemBuilder: (context, index) {
                                   final pista = _pistas[index];
-                                  final isSelected =
-                                      _pistaSeleccionada?.id == pista.id;
+                                  final isSelected = _pistaSeleccionada?.id == pista.id;
 
                                   return Container(
                                     margin: const EdgeInsets.only(bottom: 15),
                                     decoration: BoxDecoration(
                                       color: isSelected
-                                          ? Theme.of(context)
-                                              .colorScheme
-                                              .primary
-                                              .withAlpha(25)
+                                          ? Theme.of(context).colorScheme.primary.withAlpha(25)
                                           : Theme.of(context).cardColor,
                                       borderRadius: BorderRadius.circular(15),
                                       border: Border.all(
                                         color: isSelected
-                                            ? Theme.of(context)
-                                                .colorScheme
-                                                .primary
+                                            ? Theme.of(context).colorScheme.primary
                                             : Colors.transparent,
                                         width: 2,
                                       ),
@@ -418,8 +408,7 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
                                       ],
                                     ),
                                     child: ListTile(
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
+                                      contentPadding: const EdgeInsets.symmetric(
                                         horizontal: 20,
                                         vertical: 15,
                                       ),
@@ -427,28 +416,19 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
                                         width: 50,
                                         height: 50,
                                         decoration: BoxDecoration(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .primary
-                                              .withAlpha(51),
-                                          borderRadius:
-                                              BorderRadius.circular(12),
+                                          color: Theme.of(context).colorScheme.primary.withAlpha(51),
+                                          borderRadius: BorderRadius.circular(12),
                                         ),
-                                        child: pista.imagenUrl != null &&
-                                                pista.imagenUrl!.isNotEmpty
+                                        child: pista.imagenUrl != null && pista.imagenUrl!.isNotEmpty
                                             ? ClipRRect(
-                                                borderRadius:
-                                                    BorderRadius.circular(12),
+                                                borderRadius: BorderRadius.circular(12),
                                                 child: Image.asset(
                                                   pista.imagenUrl!,
                                                   fit: BoxFit.cover,
-                                                  errorBuilder: (context, error,
-                                                      stackTrace) {
+                                                  errorBuilder: (context, error, stackTrace) {
                                                     return Icon(
                                                       Icons.place,
-                                                      color: Theme.of(context)
-                                                          .colorScheme
-                                                          .primary,
+                                                      color: Theme.of(context).colorScheme.primary,
                                                       size: 25,
                                                     );
                                                   },
@@ -456,9 +436,7 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
                                               )
                                             : Icon(
                                                 Icons.place,
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .primary,
+                                                color: Theme.of(context).colorScheme.primary,
                                                 size: 25,
                                               ),
                                       ),
@@ -468,18 +446,12 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
                                           fontWeight: FontWeight.bold,
                                           fontSize: 16,
                                           color: isSelected
-                                              ? Theme.of(context)
-                                                  .colorScheme
-                                                  .primary
-                                              : Theme.of(context)
-                                                  .textTheme
-                                                  .bodyLarge
-                                                  ?.color,
+                                              ? Theme.of(context).colorScheme.primary
+                                              : Theme.of(context).textTheme.bodyLarge?.color,
                                         ),
                                       ),
                                       subtitle: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
+                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             pista.direccion,
@@ -519,27 +491,8 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
                                       onTap: () {
                                         setState(() {
                                           _pistaSeleccionada = pista;
-
-                                          if (pista.precio != null) {
-                                            // Obtener el número máximo de jugadores según el tipo de partido
-                                            final maxJugadores =
-                                                _tipoPartidoSeleccionado[
-                                                    'maxIntegrantes'];
-
-                                            // Calcular precio por persona (precio de la pista dividido entre el número de jugadores)
-                                            // Si hay un valor en el campo de integrantes, usarlo; si no, usar el máximo
-                                            final numJugadores = int.tryParse(
-                                                    _integrantesController
-                                                        .text) ??
-                                                maxJugadores;
-                                            final precioPorPersona =
-                                                (pista.precio! / numJugadores)
-                                                    .toStringAsFixed(2);
-
-                                            // Actualizar el campo de precio
-                                            _precioController.text =
-                                                precioPorPersona;
-                                          }
+                                          // Actualizar precio automáticamente
+                                          _actualizarPrecioPorPersona();
                                         });
                                         Navigator.pop(context);
                                       },
@@ -640,8 +593,7 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
             ),
             backgroundColor: Theme.of(context).colorScheme.primary,
             behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         );
 
@@ -654,25 +606,25 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
           _horaSeleccionada!.minute,
         );
 
-        final int integrantes = int.tryParse(_integrantesController.text) ?? 0;
         final double precio = double.tryParse(_precioController.text) ?? 5.0;
 
-        // Crear el modelo de partido usando el nombre de la pista seleccionada
+        // Crear el modelo de partido usando el número automático de jugadores
         final nuevoPartido = PartidoModel(
           id: 'partido_${DateTime.now().millisecondsSinceEpoch}',
           fecha: fechaHora,
           tipo: _tipoSeleccionado,
           lugar: _pistaSeleccionada!.nombre,
           completo: false,
-          jugadoresFaltantes: integrantes - 1,
+          jugadoresFaltantes: _jugadoresFaltantes, 
           precio: precio,
           duracion: 90,
           jugadores: [
             UserModel(
-                id: widget.userId,
-                email: 'usuario@example.com',
-                nombre: 'Yo',
-                esAdmin: false),
+              id: widget.userId,
+              email: 'usuario@example.com',
+              nombre: 'Yo',
+              esAdmin: false,
+            ),
           ],
         );
 
@@ -691,8 +643,7 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
               ),
               backgroundColor: Colors.green,
               behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
           );
           Navigator.pop(context, true);
@@ -707,8 +658,7 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
               content: Text('Error: ${e.toString()}'),
               backgroundColor: Colors.red,
               behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
           );
         }
@@ -801,11 +751,11 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
                   const SizedBox(height: 30),
                   _buildTipoField(),
                   const SizedBox(height: 25),
+                  _buildJugadoresInfoField(), // Nuevo campo informativo
+                  const SizedBox(height: 25),
                   _buildPrecioField(),
                   const SizedBox(height: 25),
                   _buildNombreField(),
-                  const SizedBox(height: 25),
-                  _buildIntegrantesField(),
                   const SizedBox(height: 25),
                   _buildFechaHoraFields(),
                   const SizedBox(height: 25),
@@ -886,6 +836,76 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
     );
   }
 
+  /** Construye el campo informativo de jugadores */
+  Widget _buildJugadoresInfoField() {
+    return _buildFieldContainer(
+      label: 'Información de jugadores',
+      icon: Icons.group,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: Colors.blue.withAlpha(51),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.info_outline,
+                color: Colors.blue,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 15),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Total: $_totalJugadores jugadores',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).textTheme.bodyLarge?.color,
+                    ),
+                  ),
+                  Text(
+                    'Faltan: $_jugadoresFaltantes jugadores',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.green.withAlpha(51),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'Automático',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green[700],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   /** Construye el campo de precio por persona */
   Widget _buildPrecioField() {
     return _buildFieldContainer(
@@ -925,38 +945,6 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
             return 'El nombre debe tener al menos 3 caracteres';
           }
           return null;
-        },
-      ),
-    );
-  }
-
-  /** Construye el campo de número de jugadores con validación */
-  Widget _buildIntegrantesField() {
-    final maxIntegrantes = _tipoPartidoSeleccionado['maxIntegrantes'];
-
-    return _buildFieldContainer(
-      label: 'Número de jugadores',
-      icon: Icons.group,
-      child: _buildTextField(
-        controller: _integrantesController,
-        hintText: 'Máximo: $maxIntegrantes jugadores',
-        keyboardType: TextInputType.number,
-        validator: (value) {
-          if (value == null || value.isEmpty) {
-            return 'Por favor ingresa el número de jugadores';
-          }
-          final integrantes = int.tryParse(value);
-          if (integrantes == null || integrantes < 2) {
-            return 'Debe haber al menos 2 jugadores';
-          }
-          if (integrantes > maxIntegrantes) {
-            return 'Máximo para $_tipoSeleccionado: $maxIntegrantes';
-          }
-          return null;
-        },
-        onChanged: (value) {
-          // Actualizar precio si hay una pista seleccionada
-          _actualizarPrecioPorPersona();
         },
       ),
     );
@@ -1078,10 +1066,7 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
                           width: 40,
                           height: 40,
                           decoration: BoxDecoration(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .primary
-                                .withAlpha(51),
+                            color: Theme.of(context).colorScheme.primary.withAlpha(51),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: _pistaSeleccionada!.imagenUrl != null &&
@@ -1094,9 +1079,7 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
                                     errorBuilder: (context, error, stackTrace) {
                                       return Icon(
                                         Icons.place,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .primary,
+                                        color: Theme.of(context).colorScheme.primary,
                                         size: 20,
                                       );
                                     },
@@ -1118,10 +1101,7 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
-                                  color: Theme.of(context)
-                                      .textTheme
-                                      .bodyLarge
-                                      ?.color,
+                                  color: Theme.of(context).textTheme.bodyLarge?.color,
                                 ),
                               ),
                               Text(
@@ -1318,8 +1298,7 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
         ),
         filled: true,
         fillColor: Theme.of(context).scaffoldBackgroundColor,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
         suffixIcon: suffixIcon,
         errorStyle: const TextStyle(fontSize: 12),
       ),

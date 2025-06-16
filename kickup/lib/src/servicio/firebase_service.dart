@@ -94,6 +94,16 @@ class FirebaseService {
      Lanza una excepción en caso de error. */
   Future<void> crearUsuario(UserModel usuario) async {
     try {
+      // Comprobar si ya existe un usuario con el mismo nombre
+      final query = await _usersCollection
+          .where('nombre', isEqualTo: usuario.nombre)
+          .get();
+
+      if (query.docs.isNotEmpty) {
+        throw Exception('Ya existe un usuario con ese nombre');
+      }
+
+      // Si no existe, crea el usuario normalmente
       return await _usersCollection.doc(usuario.id).set(usuario.toJson());
     } catch (e) {
       print('Error al crear usuario: $e');

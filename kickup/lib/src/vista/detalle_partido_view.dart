@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:kickup/src/componentes/app_styles.dart';
 import 'package:kickup/src/controlador/partido_controller.dart';
 import 'package:kickup/src/modelo/partido_model.dart';
-import 'package:kickup/src/servicio/user_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:kickup/src/vista/equipos_view.dart';
+import 'package:kickup/src/vista/pasarela_pago_equipo_view.dart';
 import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 import 'package:kickup/src/vista/sanciones_view.dart';
+import 'package:kickup/src/modelo/equipo_model.dart';
+import 'package:kickup/src/controlador/equipo_controller.dart';
+import 'package:kickup/src/vista/pasarela_pago_view.dart';
 
 /** Vista detallada de un partido deportivo.
  * Muestra información completa del partido, lista de jugadores inscritos,
@@ -37,22 +40,25 @@ class DetallePartidoView extends StatefulWidget {
 class _DetallePartidoViewState extends State<DetallePartidoView> {
   // Controladores para manejar la lógica 
   final PartidoController _partidoController = PartidoController();
-  final UserService _userService = UserService();
+  final EquipoController _equipoController = EquipoController();
   
   // Variables de estado principales
   PartidoModel? _partido;
   bool _isLoading = true;
   bool _usuarioInscrito = false;
   bool _procesandoSolicitud = false;
+  List<EquipoModel> _equiposUsuario = [];
 
   // Referencias para el tutorial
   final GlobalKey _inscribirseKey = GlobalKey();
+  final GlobalKey _inscribirEquipoKey = GlobalKey();
   List<TargetFocus> targets = [];
 
   @override
   void initState() {
     super.initState();
     _cargarPartido();
+    _cargarEquiposUsuario();
 
     // Iniciar tutorial si está habilitado
     if (widget.showTutorial) {
@@ -73,6 +79,18 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
           TargetContent(
             child: const Text(
               "¡Inscríbete al partido aquí!",
+              style: TextStyle(color: Colors.white, fontSize: 20),
+            ),
+          ),
+        ],
+      ),
+      TargetFocus(
+        identify: "inscribir_equipo",
+        keyTarget: _inscribirEquipoKey,
+        contents: [
+          TargetContent(
+            child: const Text(
+              "¡Inscribe a todo tu equipo de una vez!",
               style: TextStyle(color: Colors.white, fontSize: 20),
             ),
           ),
@@ -137,6 +155,34 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
           SnackBar(
               content: Text('Error al cargar el partido: ${e.toString()}')),
         );
+      }
+    }
+  }
+
+  /** Carga los equipos a los que pertenece el usuario actual */
+  Future<void> _cargarEquiposUsuario() async {
+    setState(() {
+    });
+
+    try {
+      // Obtener todos los equipos
+      final todosEquipos = await _equipoController.obtenerEquipos();
+      
+      // Filtrar solo los equipos donde el usuario es miembro
+      final misEquipos = todosEquipos.where((equipo) => 
+        equipo.jugadoresIds.contains(widget.userId)
+      ).toList();
+
+      if (mounted) {
+        setState(() {
+          _equiposUsuario = misEquipos;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+        });
+        print('Error al cargar equipos del usuario: $e');
       }
     }
   }
@@ -230,79 +276,175 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
     );
   }
 
-  /** Procesa la inscripción del usuario al partido.
-   * Obtiene los datos del usuario y los envía al controlador
-   * para registrar la inscripción en el partido.
+  /** Navega a la pasarela de pago para procesar la inscripción.
+   * Navega a la pasarela de pago en lugar de inscribirse directamente.
    */
-  Future<void> _inscribirsePartido() async {
-    if (_procesandoSolicitud) return;
-
-    setState(() {
-      _procesandoSolicitud = true;
-    });
+  Future<void> _navegarAPasarelaPago() async {
+    if (_procesandoSolicitud || _partido == null) return;
 
     try {
-      final user = await _userService.getUser(widget.userId);
-      if (user == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No se pudo obtener el usuario')),
-          );
-        }
-        return;
-      }
-
-      final success =
-          await _partidoController.inscribirsePartido(widget.partidoId, user);
-
-      if (success && mounted) {
-        // Actualizar estado inmediatamente para mejor UX
-        setState(() {
-          _usuarioInscrito = true;
-          if (_partido != null) {
-            _partido = _partido!.copyWith(
-              jugadoresFaltantes: _partido!.jugadoresFaltantes - 1,
-              completo: _partido!.jugadoresFaltantes <= 1,
-            );
-          }
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Te has inscrito al partido correctamente'),
-            backgroundColor: Colors.green,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-            ),
-            behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.all(16),
+      // Navegar a la pasarela de pago
+      final resultado = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (context) => PasarelaPagoView(
+            partidoId: widget.partidoId,
+            userId: widget.userId,
+            partido: _partido!,
           ),
-        );
+        ),
+      );
 
-        // Volver a la pantalla anterior con resultado
+      // Si el pago fue exitoso, actualizar la vista
+      if (resultado == true && mounted) {
+        // Recargar los datos del partido para reflejar la inscripción
+        await _cargarPartido();
+        
+        // Volver a la pantalla anterior con resultado exitoso
         Navigator.pop(context, true);
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Error al inscribirse al partido'),
-            backgroundColor: Colors.red,
-          ),
-        );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: ${e.toString()}'),
+            content: Text('Error al procesar el pago: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );
       }
-    } finally {
+    }
+  }
+
+  /** Muestra un diálogo para seleccionar un equipo y registrar a todos sus miembros */
+  Future<void> _mostrarDialogoSeleccionEquipo() async {
+    if (_equiposUsuario.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No perteneces a ningún equipo. Crea o únete a un equipo primero.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final EquipoModel? equipoSeleccionado = await showDialog<EquipoModel>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Seleccionar equipo'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: _equiposUsuario.length,
+            itemBuilder: (context, index) {
+              final equipo = _equiposUsuario[index];
+              return ListTile(
+                leading: CircleAvatar(
+                  backgroundImage: equipo.logoUrl.isNotEmpty 
+                      ? NetworkImage(equipo.logoUrl) 
+                      : null,
+                  child: equipo.logoUrl.isEmpty 
+                      ? const Icon(Icons.group) 
+                      : null,
+                ),
+                title: Text(equipo.nombre),
+                subtitle: Text('${equipo.jugadoresIds.length} jugadores'),
+                onTap: () => Navigator.of(context).pop(equipo),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(null),
+            child: const Text('Cancelar'),
+          ),
+        ],
+      ),
+    );
+
+    if (equipoSeleccionado != null) {
+      _navegarAPasarelaEquipo(equipoSeleccionado);
+    }
+  }
+
+  /** Navega a la pasarela de pago para inscribir un equipo completo */
+  Future<void> _navegarAPasarelaEquipo(EquipoModel equipo) async {
+    if (_procesandoSolicitud || _partido == null) return;
+
+    // Calcular el precio total para el equipo
+    final int jugadoresAInscribir = _partido!.jugadoresFaltantes >= equipo.jugadoresIds.length 
+        ? equipo.jugadoresIds.length 
+        : _partido!.jugadoresFaltantes;
+    
+    final double precioTotal = _partido!.precio * jugadoresAInscribir;
+
+    // Crear un partido temporal con el precio total para el equipo
+    final partidoEquipo = _partido!.copyWith(precio: precioTotal);
+
+    try {
+      // Mostrar diálogo de confirmación con detalles del pago
+      final confirmar = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Confirmar inscripción de equipo'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Equipo: ${equipo.nombre}'),
+              Text('Jugadores a inscribir: $jugadoresAInscribir'),
+              Text('Precio por jugador: ${_partido!.precio.toStringAsFixed(2)}€'),
+              const Divider(),
+              Text(
+                'Total a pagar: ${precioTotal.toStringAsFixed(2)}€',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Continuar al pago'),
+            ),
+          ],
+        ),
+      ) ?? false;
+
+      if (!confirmar) return;
+
+      // Navegar a la pasarela de pago con el precio del equipo
+      final resultado = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (context) => PasarelaPagoEquipoView(
+            partidoId: widget.partidoId,
+            userId: widget.userId,
+            partido: partidoEquipo,
+            equipo: equipo,
+            jugadoresAInscribir: jugadoresAInscribir,
+          ),
+        ),
+      );
+
+      // Si el pago fue exitoso, actualizar la vista
+      if (resultado == true && mounted) {
+        // Recargar los datos del partido para reflejar las inscripciones
+        await _cargarPartido();
+        
+        // Volver a la pantalla anterior con resultado exitoso
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
       if (mounted) {
-        setState(() {
-          _procesandoSolicitud = false;
-        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al procesar el pago del equipo: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -549,7 +691,7 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
             _buildPlayersSection(), // Lista de jugadores
             // Botón de gestionar asistencia (solo para el creador)
             if (_esCreadorDelPartido()) _buildGestionarAsistenciaButton(),
-            _buildActionButton(), // Botón de acción
+            _buildActionButtons(), // Botones de acción
             const SizedBox(height: 16),
           ],
         ),
@@ -836,118 +978,254 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
         final nombre = userData['nombre'] ?? '';
         final apellidos = userData['apellidos'] ?? '';
         final posicion = userData['posicion'] ?? 'Sin posición';
-        final puntos = userData['puntos'] ?? 15; // Obtener puntos del usuario
+        final puntos = userData['puntos'] ?? 15;
 
-        return ListTile(
-          leading: CircleAvatar(
-            radius: 20,
-            backgroundColor: Theme.of(context).colorScheme.primary,
-            backgroundImage: (imageUrl != null && imageUrl.isNotEmpty)
-                ? NetworkImage(imageUrl)
-                : null,
-            child: (imageUrl == null || imageUrl.isEmpty)
-                ? const Icon(Icons.person, color: Colors.white)
-                : null,
-          ),
-          title: Text(
-            '$nombre $apellidos',
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
+        // StreamBuilder adicional para obtener el equipo del jugador
+        return StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('equipos')
+              .where('jugadoresIds', arrayContains: jugadorId)
+              .snapshots(),
+          builder: (context, equiposSnapshot) {
+            String equipoNombre = 'Sin equipo';
+            
+            if (equiposSnapshot.hasData && equiposSnapshot.data!.docs.isNotEmpty) {
+              // Tomar el primer equipo encontrado
+              final equipoData = equiposSnapshot.data!.docs.first.data() as Map<String, dynamic>;
+              equipoNombre = equipoData['nombre'] ?? 'Sin equipo';
+            }
+
+            return Container(
+              margin: const EdgeInsets.symmetric(vertical: 4),
+              decoration: BoxDecoration(
+                color: jugadorId == widget.userId 
+                    ? Theme.of(context).colorScheme.primary.withAlpha(25)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+                border: jugadorId == widget.userId 
+                    ? Border.all(
+                        color: Theme.of(context).colorScheme.primary.withAlpha(102),
+                        width: 1,
+                      )
+                    : null,
+              ),
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                leading: CircleAvatar(
+                  radius: 22,
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  backgroundImage: (imageUrl != null && imageUrl.isNotEmpty)
+                      ? NetworkImage(imageUrl)
+                      : null,
+                  child: (imageUrl == null || imageUrl.isEmpty)
+                      ? const Icon(Icons.person, color: Colors.white, size: 20)
+                      : null,
                 ),
-          ),
-          subtitle: Text(
-            posicion,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          // Mostrar puntos y indicador de usuario actual
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Indicar si es el usuario actual (ahora primero)
-              if (jugadorId == widget.userId) ...[
-                Icon(
-                  Icons.person,
-                  color: Theme.of(context).colorScheme.primary,
-                  size: 20,
+                title: Text(
+                  '$nombre $apellidos',
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: jugadorId == widget.userId 
+                            ? Theme.of(context).colorScheme.primary
+                            : null,
+                      ),
                 ),
-                const SizedBox(width: 8),
-              ],
-              // Mostrar puntos (ahora después del icono)
-              Text(
-                '$puntos pts',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.primary,
-                  fontWeight: FontWeight.bold,
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 2),
+                    // Mostrar posición
+                    Text(
+                      posicion,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontSize: 13,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
+                    // Mostrar equipo con icono
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.group,
+                          size: 14,
+                          color: Colors.grey[600],
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            equipoNombre,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: equipoNombre == 'Sin equipo' 
+                                  ? Colors.grey[500]
+                                  : Theme.of(context).colorScheme.secondary,
+                              fontWeight: equipoNombre == 'Sin equipo' 
+                                  ? FontWeight.normal
+                                  : FontWeight.w600,
+                              fontStyle: equipoNombre == 'Sin equipo' 
+                                  ? FontStyle.italic
+                                  : FontStyle.normal,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Indicar si es el usuario actual
+                    if (jugadorId == widget.userId) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Text(
+                          'Tú',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    // Mostrar puntos en formato vertical
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '$puntos',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        Text(
+                          'pts',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
   }
 
-  /** Construye el botón de acción principal (inscribirse/abandonar) */
-  Widget _buildActionButton() {
+  /** Construye los botones de acción (inscribirse/abandonar e inscribir equipo) */
+  Widget _buildActionButtons() {
     final isCompleto = _partido!.completo;
     final puedeInscribirse = !isCompleto || _usuarioInscrito;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: SizedBox(
-        width: double.infinity,
-        child: ElevatedButton(
-          key: _inscribirseKey, // Key para el tutorial
-          onPressed: _procesandoSolicitud || (!puedeInscribirse)
-              ? null
-              : _usuarioInscrito
-                  ? _abandonarPartido
-                  : _inscribirsePartido,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: _usuarioInscrito
-                ? Colors.red
-                : Theme.of(context).colorScheme.primary,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 13),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(30),
+      child: Column(
+        children: [
+          // Botón principal (inscribirse/abandonar) 
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              key: _inscribirseKey, // Key para el tutorial
+              onPressed: _procesandoSolicitud || (!puedeInscribirse)
+                  ? null
+                  : _usuarioInscrito
+                      ? _abandonarPartido
+                      : _navegarAPasarelaPago, 
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _usuarioInscrito
+                    ? Colors.red
+                    : Theme.of(context).colorScheme.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                disabledBackgroundColor: Colors.grey,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (_procesandoSolicitud) ...[
+                    const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                  ],
+                  if (_usuarioInscrito && !_procesandoSolicitud) ...[
+                    const Icon(Icons.exit_to_app, size: 20),
+                    const SizedBox(width: 8),
+                  ],
+                  if (!_usuarioInscrito && !_procesandoSolicitud) ...[
+                    const Icon(Icons.payment, size: 20),
+                    const SizedBox(width: 8),
+                  ],
+                  Text(
+                    _procesandoSolicitud
+                        ? 'Procesando...'
+                        : _usuarioInscrito
+                            ? 'Abandonar partido'
+                            : isCompleto
+                                ? 'Partido completo'
+                                : 'Pagar e inscribirse',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            disabledBackgroundColor: Colors.grey,
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (_procesandoSolicitud) ...[
-                const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+          
+          // Botón para inscribir equipo completo (solo si no está inscrito y hay plazas)
+          if (!_usuarioInscrito && !isCompleto && _partido!.jugadoresFaltantes > 1) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                key: _inscribirEquipoKey, // Key para el tutorial
+                onPressed: _procesandoSolicitud ? null : _mostrarDialogoSeleccionEquipo,
+                icon: const Icon(Icons.group_add, size: 20),
+                label: const Text(
+                  'Pagar e inscribir equipo',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(width: 12),
-              ],
-              if (_usuarioInscrito && !_procesandoSolicitud) ...[
-                const Icon(Icons.exit_to_app, size: 20),
-                const SizedBox(width: 8),
-              ],
-              Text(
-                _procesandoSolicitud
-                    ? 'Procesando...'
-                    : _usuarioInscrito
-                        ? 'Abandonar partido'
-                        : isCompleto
-                            ? 'Partido completo'
-                            : 'Inscribirse al partido',
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.amber.shade700,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  disabledBackgroundColor: Colors.grey,
                 ),
               ),
-            ],
-          ),
-        ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -991,3 +1269,4 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
     );
   }
 }
+
