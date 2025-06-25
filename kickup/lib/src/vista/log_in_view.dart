@@ -10,6 +10,7 @@ import '../preferences/pref_usuarios.dart';
  * Proporciona autenticación mediante Firebase Auth con validación
  * de credenciales, manejo de errores específicos y navegación
  * automática según el tipo de usuario (admin/jugador).
+ * Incluye texto negro en formularios para modo oscuro.
  */
 class LogInPage extends StatefulWidget {
   static const String routeName = '/login';
@@ -26,7 +27,7 @@ class _LogInPageState extends State<LogInPage> {
   bool _isLoading = false;
 
   /** Maneja el proceso de inicio de sesión con Firebase Auth.
-   * CAMBIO PRINCIPAL: Ahora verifica si el usuario es admin antes de navegar.
+   * Verifica si el usuario es admin antes de navegar.
    * Incluye validación de credenciales, creación automática de documento
    * en Firestore si no existe, y navegación a la vista correcta según el tipo de usuario.
    */
@@ -67,7 +68,7 @@ class _LogInPageState extends State<LogInPage> {
             });
           }
 
-          // CAMBIO PRINCIPAL: Verificar si es admin antes de navegar
+          // Verificar si es admin antes de navegar
           await _navigateBasedOnUserType(userId);
         } catch (firestoreError) {
           // En caso de error, ir a partidos por defecto
@@ -83,7 +84,14 @@ class _LogInPageState extends State<LogInPage> {
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Error al iniciar sesión')),
+            SnackBar(
+              content: const Text('Error al iniciar sesión'),
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+              behavior: SnackBarBehavior.floating,
+            ),
           );
         }
       }
@@ -109,7 +117,14 @@ class _LogInPageState extends State<LogInPage> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errorMessage)),
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } finally {
@@ -277,6 +292,12 @@ class _InputSection extends StatelessWidget {
     required this.isLoading,
   }) : super(key: key);
 
+  /** Obtiene el color de texto para los formularios según el tema */
+  Color _getFormTextColor(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    return brightness == Brightness.dark ? Colors.black : Colors.black87;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -295,12 +316,14 @@ class _InputSection extends StatelessWidget {
             label: 'USUARIO',
             isPassword: false,
             controller: emailController,
+            textColor: _getFormTextColor(context),
           ),
           const SizedBox(height: 20),
           _InputField(
             label: 'CONTRASEÑA',
             isPassword: true,
             controller: passwordController,
+            textColor: _getFormTextColor(context),
           ),
           const SizedBox(height: 30),
           Center(
@@ -313,6 +336,7 @@ class _InputSection extends StatelessWidget {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
                 ),
+                elevation: 3,
               ),
               child: isLoading
                   ? const SizedBox(
@@ -348,6 +372,7 @@ class _InputSection extends StatelessWidget {
                   color: Colors.white,
                   decoration: TextDecoration.underline,
                   fontWeight: FontWeight.bold,
+                  fontSize: 16,
                 ),
               ),
             ),
@@ -360,18 +385,20 @@ class _InputSection extends StatelessWidget {
 
 /** Campo de entrada personalizado con etiqueta y estilo consistente.
  * Soporta modo de contraseña para ocultar texto y aplica
- * el esquema de colores de la aplicación.
+ * el esquema de colores de la aplicación con texto negro en modo oscuro.
  */
 class _InputField extends StatelessWidget {
   final String label;
   final bool isPassword;
   final TextEditingController controller;
+  final Color textColor;
 
   const _InputField({
     Key? key,
     required this.label,
     required this.isPassword,
     required this.controller,
+    required this.textColor,
   }) : super(key: key);
 
   @override
@@ -391,12 +418,21 @@ class _InputField extends StatelessWidget {
         TextField(
           controller: controller,
           obscureText: isPassword,
+          style: TextStyle(
+            color: textColor,
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+          ),
           decoration: InputDecoration(
             filled: true,
             fillColor: const Color.fromARGB(255, 183, 210, 184),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(20),
               borderSide: BorderSide.none,
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 16,
             ),
           ),
         ),

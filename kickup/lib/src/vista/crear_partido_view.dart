@@ -6,13 +6,7 @@ import '../modelo/partido_model.dart';
 import '../modelo/user_model.dart';
 import '../modelo/pista_model.dart';
 
-/** Vista para crear un nuevo partido.
- * Permite al usuario ingresar información del partido como tipo, precio,
- * nombre, fecha, hora y pista. El número de jugadores se establece automáticamente
- * según el tipo de partido seleccionado, incluyendo al creador.
- */
 class CrearPartidoView extends StatefulWidget {
-  /** ID del usuario que está creando el partido */
   final String userId;
 
   const CrearPartidoView({
@@ -30,23 +24,19 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
   final PartidoController _partidoController = PartidoController();
   final PistaController _pistaController = PistaController();
 
-  // Controladores para los campos de texto
   final TextEditingController _nombreController = TextEditingController();
   final TextEditingController _fechaController = TextEditingController();
   final TextEditingController _horaController = TextEditingController();
   final TextEditingController _precioController = TextEditingController();
 
-  // Variables para almacenar los valores seleccionados
   DateTime? _fechaSeleccionada;
   TimeOfDay? _horaSeleccionada;
   bool _isLoading = false;
 
-  // Variables para pistas
   List<PistaModel> _pistas = [];
   PistaModel? _pistaSeleccionada;
   bool _cargandoPistas = true;
 
-  /** Lista de tipos de partido disponibles con sus metadatos */
   final List<Map<String, dynamic>> _tiposPartido = [
     {
       'nombre': 'Fútbol 5',
@@ -73,7 +63,6 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
 
   String _tipoSeleccionado = 'Fútbol 5';
 
-  // Controladores de animación
   late AnimationController _fadeController;
   late AnimationController _scaleController;
   late Animation<double> _fadeAnimation;
@@ -83,7 +72,6 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
   void initState() {
     super.initState();
 
-    // Inicializar animaciones
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
@@ -100,17 +88,12 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
       CurvedAnimation(parent: _scaleController, curve: Curves.elasticOut),
     );
 
-    // Iniciar animaciones
     _fadeController.forward();
     _scaleController.forward();
 
-    // Cargar pistas disponibles
     _cargarPistas();
   }
 
-  /** Actualiza el precio por persona basado en la pista seleccionada y el número de jugadores automático.
-   * Calcula dividiendo el precio total de la pista entre el número total de jugadores del tipo seleccionado.
-   */
   void _actualizarPrecioPorPersona() {
     if (_pistaSeleccionada?.precio != null) {
       final totalJugadores = _tipoPartidoSeleccionado['totalJugadores'];
@@ -130,13 +113,9 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
     super.dispose();
   }
 
-  /** Carga las pistas disponibles desde el controlador.
-   * Filtra solo las pistas que están marcadas como disponibles.
-   */
   Future<void> _cargarPistas() async {
     try {
       final pistas = await _pistaController.obtenerPistas();
-      // Filtrar solo las pistas disponibles
       final pistasDisponibles = pistas.where((pista) => pista.disponible).toList();
 
       if (mounted) {
@@ -160,7 +139,6 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
     }
   }
 
-  /** Obtiene el tipo de partido seleccionado de la lista de tipos disponibles */
   Map<String, dynamic> get _tipoPartidoSeleccionado {
     return _tiposPartido.firstWhere(
       (tipo) => tipo['nombre'] == _tipoSeleccionado,
@@ -168,20 +146,14 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
     );
   }
 
-  /** Obtiene el número total de jugadores para el tipo de partido seleccionado */
   int get _totalJugadores {
     return _tipoPartidoSeleccionado['totalJugadores'];
   }
 
-  /** Obtiene el número de jugadores que faltan (excluyendo al creador) */
   int get _jugadoresFaltantes {
-    return _totalJugadores - 1; // -1 porque el creador ya está incluido
+    return _totalJugadores - 1;
   }
 
-  /** Muestra el selector de tipo de partido en un modal.
-   * Permite al usuario elegir entre diferentes tipos de partidos
-   * con una interfaz visual mejorada.
-   */
   void _mostrarSelectorTipo() {
     showModalBottomSheet(
       context: context,
@@ -199,7 +171,6 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
               padding: const EdgeInsets.all(20.0),
               child: Column(
                 children: [
-                  // Handle bar
                   Container(
                     width: 50,
                     height: 5,
@@ -210,7 +181,6 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
                   ),
                   const SizedBox(height: 20),
 
-                  // Título
                   Text(
                     'Seleccionar tipo de partido',
                     style: TextStyle(
@@ -221,7 +191,6 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
                   ),
                   const SizedBox(height: 25),
 
-                  // Lista de tipos
                   Expanded(
                     child: ListView.builder(
                       itemCount: _tiposPartido.length,
@@ -293,7 +262,6 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
                             onTap: () {
                               setState(() {
                                 _tipoSeleccionado = tipo['nombre'];
-                                // Actualizar precio automáticamente
                                 _actualizarPrecioPorPersona();
                               });
                               Navigator.pop(context);
@@ -312,10 +280,6 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
     );
   }
 
-  /** Muestra el selector de pistas en un modal.
-   * Permite al usuario elegir entre las pistas disponibles
-   * mostrando detalles como nombre, dirección, tipo y precio.
-   */
   void _mostrarSelectorPista() {
     showModalBottomSheet(
       context: context,
@@ -333,7 +297,6 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
               padding: const EdgeInsets.all(20.0),
               child: Column(
                 children: [
-                  // Handle bar
                   Container(
                     width: 50,
                     height: 5,
@@ -344,7 +307,6 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
                   ),
                   const SizedBox(height: 20),
 
-                  // Título
                   Text(
                     'Seleccionar pista',
                     style: TextStyle(
@@ -355,7 +317,6 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
                   ),
                   const SizedBox(height: 25),
 
-                  // Lista de pistas
                   Expanded(
                     child: _cargandoPistas
                         ? const Center(child: CircularProgressIndicator())
@@ -491,7 +452,6 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
                                       onTap: () {
                                         setState(() {
                                           _pistaSeleccionada = pista;
-                                          // Actualizar precio automáticamente
                                           _actualizarPrecioPorPersona();
                                         });
                                         Navigator.pop(context);
@@ -510,9 +470,6 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
     );
   }
 
-  /** Muestra el selector de fecha con estilo personalizado.
-   * Utiliza el DatePicker nativo de Flutter con tema personalizado.
-   */
   Future<void> _seleccionarFecha() async {
     final DateTime? pickedDate = await showDatePicker(
       context: context,
@@ -540,9 +497,6 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
     }
   }
 
-  /** Muestra el selector de hora con estilo personalizado.
-   * Utiliza el TimePicker nativo de Flutter con tema personalizado.
-   */
   Future<void> _seleccionarHora() async {
     final TimeOfDay? pickedTime = await showTimePicker(
       context: context,
@@ -568,16 +522,11 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
     }
   }
 
-  /** Guarda el partido en la base de datos.
-   * Valida el formulario, crea un modelo de partido y lo envía al controlador.
-   * Muestra mensajes de progreso y resultado al usuario.
-   */
   Future<void> _guardarPartido() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
 
       try {
-        // Mostrar progreso
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Row(
@@ -597,7 +546,6 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
           ),
         );
 
-        // Crear la fecha y hora combinadas
         final DateTime fechaHora = DateTime(
           _fechaSeleccionada!.year,
           _fechaSeleccionada!.month,
@@ -608,7 +556,6 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
 
         final double precio = double.tryParse(_precioController.text) ?? 5.0;
 
-        // Crear el modelo de partido usando el número automático de jugadores
         final nuevoPartido = PartidoModel(
           id: 'partido_${DateTime.now().millisecondsSinceEpoch}',
           fecha: fechaHora,
@@ -679,7 +626,6 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
     );
   }
 
-  /** Construye el AppBar con estilo personalizado */
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       backgroundColor: Colors.transparent,
@@ -706,7 +652,6 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
     );
   }
 
-  /** Construye el estado de carga con animación centrada */
   Widget _buildLoadingState() {
     return Center(
       child: Column(
@@ -734,7 +679,6 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
     );
   }
 
-  /** Construye el contenido del formulario con animaciones */
   Widget _buildFormContent() {
     return FadeTransition(
       opacity: _fadeAnimation,
@@ -751,7 +695,7 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
                   const SizedBox(height: 30),
                   _buildTipoField(),
                   const SizedBox(height: 25),
-                  _buildJugadoresInfoField(), // Nuevo campo informativo
+                  _buildJugadoresInfoField(),
                   const SizedBox(height: 25),
                   _buildPrecioField(),
                   const SizedBox(height: 25),
@@ -772,7 +716,6 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
     );
   }
 
-  /** Construye el campo de selección de tipo de partido */
   Widget _buildTipoField() {
     final tipoSeleccionado = _tipoPartidoSeleccionado;
 
@@ -836,7 +779,6 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
     );
   }
 
-  /** Construye el campo informativo de jugadores */
   Widget _buildJugadoresInfoField() {
     return _buildFieldContainer(
       label: 'Información de jugadores',
@@ -906,30 +848,65 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
     );
   }
 
-  /** Construye el campo de precio por persona */
   Widget _buildPrecioField() {
     return _buildFieldContainer(
-      label: 'Precio por persona',
+      label: 'Precio por persona (calculado automáticamente)',
       icon: Icons.euro,
-      child: _buildTextField(
-        controller: _precioController,
-        hintText: 'Ej: 5.00',
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        validator: (value) {
-          if (value == null || value.isEmpty) {
-            return 'Por favor ingresa el precio';
-          }
-          final precio = double.tryParse(value);
-          if (precio == null || precio < 0) {
-            return 'El precio debe ser un número positivo';
-          }
-          return null;
-        },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: Colors.green.withAlpha(51),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.euro,
+                color: Colors.green,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 15),
+            Expanded(
+              child: Text(
+                _precioController.text.isEmpty 
+                    ? '' 
+                    : '€${_precioController.text} por jugador',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).textTheme.bodyLarge?.color,
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.blue.withAlpha(51),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'Automático',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue[700],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  /** Construye el campo de nombre del partido */
   Widget _buildNombreField() {
     return _buildFieldContainer(
       label: 'Nombre del partido',
@@ -950,7 +927,6 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
     );
   }
 
-  /** Construye los campos de fecha y hora en una fila */
   Widget _buildFechaHoraFields() {
     return Row(
       children: [
@@ -997,7 +973,6 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
     );
   }
 
-  /** Construye el campo de selección de pista */
   Widget _buildPistaField() {
     return _buildFieldContainer(
       label: 'Pista',
@@ -1127,11 +1102,6 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
     );
   }
 
-  /** Construye un contenedor de campo con etiqueta e icono.
-   * @param label Etiqueta del campo
-   * @param icon Icono representativo
-   * @param child Widget hijo (generalmente un TextField)
-   */
   Widget _buildFieldContainer({
     required String label,
     required IconData icon,
@@ -1168,12 +1138,14 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
                 ),
               ),
               const SizedBox(width: 12),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).textTheme.bodyLarge?.color,
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).textTheme.bodyLarge?.color,
+                  ),
                 ),
               ),
             ],
@@ -1185,9 +1157,7 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
     );
   }
 
-  /** Construye el botón de guardar con gradiente y estado condicional */
   Widget _buildGuardarButton() {
-    // Validar que se haya seleccionado una pista
     final bool puedeGuardar = _pistaSeleccionada != null && !_isLoading;
 
     return Container(
@@ -1261,16 +1231,6 @@ class _CrearPartidoViewState extends State<CrearPartidoView>
     );
   }
 
-  /** Construye un campo de texto con estilo personalizado.
-   * @param controller Controlador del campo
-   * @param hintText Texto de ayuda
-   * @param keyboardType Tipo de teclado
-   * @param readOnly Si es de solo lectura
-   * @param onTap Función al tocar
-   * @param suffixIcon Icono al final del campo
-   * @param validator Función de validación
-   * @param onChanged Función al cambiar el texto
-   */
   Widget _buildTextField({
     required TextEditingController controller,
     required String hintText,

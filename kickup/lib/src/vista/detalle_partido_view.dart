@@ -19,18 +19,18 @@ import 'package:kickup/src/vista/pasarela_pago_view.dart';
 class DetallePartidoView extends StatefulWidget {
   /** ID del partido a mostrar */
   final String partidoId;
-  
+
   /** ID del usuario actual */
   final String userId;
-  
+
   /** Indica si se debe mostrar el tutorial */
-  final bool showTutorial; 
+  final bool showTutorial;
 
   const DetallePartidoView({
     Key? key,
     required this.partidoId,
     required this.userId,
-    this.showTutorial = false, 
+    this.showTutorial = false,
   }) : super(key: key);
 
   @override
@@ -38,10 +38,10 @@ class DetallePartidoView extends StatefulWidget {
 }
 
 class _DetallePartidoViewState extends State<DetallePartidoView> {
-  // Controladores para manejar la lógica 
+  // Controladores para manejar la lógica
   final PartidoController _partidoController = PartidoController();
   final EquipoController _equipoController = EquipoController();
-  
+
   // Variables de estado principales
   PartidoModel? _partido;
   bool _isLoading = true;
@@ -161,17 +161,16 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
 
   /** Carga los equipos a los que pertenece el usuario actual */
   Future<void> _cargarEquiposUsuario() async {
-    setState(() {
-    });
+    setState(() {});
 
     try {
       // Obtener todos los equipos
       final todosEquipos = await _equipoController.obtenerEquipos();
-      
+
       // Filtrar solo los equipos donde el usuario es miembro
-      final misEquipos = todosEquipos.where((equipo) => 
-        equipo.jugadoresIds.contains(widget.userId)
-      ).toList();
+      final misEquipos = todosEquipos
+          .where((equipo) => equipo.jugadoresIds.contains(widget.userId))
+          .toList();
 
       if (mounted) {
         setState(() {
@@ -180,8 +179,7 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-        });
+        setState(() {});
         print('Error al cargar equipos del usuario: $e');
       }
     }
@@ -208,7 +206,8 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
     });
 
     try {
-      final success = await _partidoController.eliminarPartido(widget.partidoId);
+      final success =
+          await _partidoController.eliminarPartido(widget.partidoId);
 
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -298,7 +297,7 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
       if (resultado == true && mounted) {
         // Recargar los datos del partido para reflejar la inscripción
         await _cargarPartido();
-        
+
         // Volver a la pantalla anterior con resultado exitoso
         Navigator.pop(context, true);
       }
@@ -319,7 +318,8 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
     if (_equiposUsuario.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No perteneces a ningún equipo. Crea o únete a un equipo primero.'),
+          content: Text(
+              'No perteneces a ningún equipo. Crea o únete a un equipo primero.'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -339,12 +339,11 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
               final equipo = _equiposUsuario[index];
               return ListTile(
                 leading: CircleAvatar(
-                  backgroundImage: equipo.logoUrl.isNotEmpty 
-                      ? NetworkImage(equipo.logoUrl) 
+                  backgroundImage: equipo.logoUrl.isNotEmpty
+                      ? NetworkImage(equipo.logoUrl)
                       : null,
-                  child: equipo.logoUrl.isEmpty 
-                      ? const Icon(Icons.group) 
-                      : null,
+                  child:
+                      equipo.logoUrl.isEmpty ? const Icon(Icons.group) : null,
                 ),
                 title: Text(equipo.nombre),
                 subtitle: Text('${equipo.jugadoresIds.length} jugadores'),
@@ -372,10 +371,11 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
     if (_procesandoSolicitud || _partido == null) return;
 
     // Calcular el precio total para el equipo
-    final int jugadoresAInscribir = _partido!.jugadoresFaltantes >= equipo.jugadoresIds.length 
-        ? equipo.jugadoresIds.length 
-        : _partido!.jugadoresFaltantes;
-    
+    final int jugadoresAInscribir =
+        _partido!.jugadoresFaltantes >= equipo.jugadoresIds.length
+            ? equipo.jugadoresIds.length
+            : _partido!.jugadoresFaltantes;
+
     final double precioTotal = _partido!.precio * jugadoresAInscribir;
 
     // Crear un partido temporal con el precio total para el equipo
@@ -384,35 +384,38 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
     try {
       // Mostrar diálogo de confirmación con detalles del pago
       final confirmar = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Confirmar inscripción de equipo'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Equipo: ${equipo.nombre}'),
-              Text('Jugadores a inscribir: $jugadoresAInscribir'),
-              Text('Precio por jugador: ${_partido!.precio.toStringAsFixed(2)}€'),
-              const Divider(),
-              Text(
-                'Total a pagar: ${precioTotal.toStringAsFixed(2)}€',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Confirmar inscripción de equipo'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Equipo: ${equipo.nombre}'),
+                  Text('Jugadores a inscribir: $jugadoresAInscribir'),
+                  Text(
+                      'Precio por jugador: ${_partido!.precio.toStringAsFixed(2)}€'),
+                  const Divider(),
+                  Text(
+                    'Total a pagar: ${precioTotal.toStringAsFixed(2)}€',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ],
               ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancelar'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Cancelar'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text('Continuar al pago'),
+                ),
+              ],
             ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Continuar al pago'),
-            ),
-          ],
-        ),
-      ) ?? false;
+          ) ??
+          false;
 
       if (!confirmar) return;
 
@@ -433,7 +436,7 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
       if (resultado == true && mounted) {
         // Recargar los datos del partido para reflejar las inscripciones
         await _cargarPartido();
-        
+
         // Volver a la pantalla anterior con resultado exitoso
         Navigator.pop(context, true);
       }
@@ -441,7 +444,8 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al procesar el pago del equipo: ${e.toString()}'),
+            content:
+                Text('Error al procesar el pago del equipo: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -677,7 +681,7 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withAlpha(25), 
+              color: Colors.black.withAlpha(25),
               blurRadius: 8,
               offset: const Offset(0, 4),
             ),
@@ -846,7 +850,7 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
                 ),
               ),
             );
-            
+
             if (resultado == true) {
               // Recargar datos si se guardaron cambios
               _cargarPartido();
@@ -988,29 +992,35 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
               .snapshots(),
           builder: (context, equiposSnapshot) {
             String equipoNombre = 'Sin equipo';
-            
-            if (equiposSnapshot.hasData && equiposSnapshot.data!.docs.isNotEmpty) {
+
+            if (equiposSnapshot.hasData &&
+                equiposSnapshot.data!.docs.isNotEmpty) {
               // Tomar el primer equipo encontrado
-              final equipoData = equiposSnapshot.data!.docs.first.data() as Map<String, dynamic>;
+              final equipoData = equiposSnapshot.data!.docs.first.data()
+                  as Map<String, dynamic>;
               equipoNombre = equipoData['nombre'] ?? 'Sin equipo';
             }
 
             return Container(
               margin: const EdgeInsets.symmetric(vertical: 4),
               decoration: BoxDecoration(
-                color: jugadorId == widget.userId 
-                    ? Theme.of(context).colorScheme.primary.withAlpha(25)
+                color: jugadorId == widget.userId
+                    ? Theme.of(context).colorScheme.primary.withAlpha(50)
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(12),
-                border: jugadorId == widget.userId 
+                border: jugadorId == widget.userId
                     ? Border.all(
-                        color: Theme.of(context).colorScheme.primary.withAlpha(102),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withAlpha(102),
                         width: 1,
                       )
                     : null,
               ),
               child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 leading: CircleAvatar(
                   radius: 22,
                   backgroundColor: Theme.of(context).colorScheme.primary,
@@ -1025,7 +1035,7 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
                   '$nombre $apellidos',
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: jugadorId == widget.userId 
+                        color: jugadorId == widget.userId
                             ? Theme.of(context).colorScheme.primary
                             : null,
                       ),
@@ -1056,13 +1066,13 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
                             equipoNombre,
                             style: TextStyle(
                               fontSize: 12,
-                              color: equipoNombre == 'Sin equipo' 
+                              color: equipoNombre == 'Sin equipo'
                                   ? Colors.grey[500]
                                   : Theme.of(context).colorScheme.secondary,
-                              fontWeight: equipoNombre == 'Sin equipo' 
+                              fontWeight: equipoNombre == 'Sin equipo'
                                   ? FontWeight.normal
                                   : FontWeight.w600,
-                              fontStyle: equipoNombre == 'Sin equipo' 
+                              fontStyle: equipoNombre == 'Sin equipo'
                                   ? FontStyle.italic
                                   : FontStyle.normal,
                             ),
@@ -1079,7 +1089,8 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
                     // Indicar si es el usuario actual
                     if (jugadorId == widget.userId) ...[
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: Theme.of(context).colorScheme.primary,
                           borderRadius: BorderRadius.circular(12),
@@ -1136,16 +1147,16 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Column(
         children: [
-          // Botón principal (inscribirse/abandonar) 
+          // Botón principal (inscribirse/abandonar)
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              key: _inscribirseKey, // Key para el tutorial
+              key: _inscribirseKey,
               onPressed: _procesandoSolicitud || (!puedeInscribirse)
                   ? null
                   : _usuarioInscrito
                       ? _abandonarPartido
-                      : _navegarAPasarelaPago, 
+                      : _navegarAPasarelaPago,
               style: ElevatedButton.styleFrom(
                 backgroundColor: _usuarioInscrito
                     ? Colors.red
@@ -1196,15 +1207,19 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
               ),
             ),
           ),
-          
+
           // Botón para inscribir equipo completo (solo si no está inscrito y hay plazas)
-          if (!_usuarioInscrito && !isCompleto && _partido!.jugadoresFaltantes > 1) ...[
+          if (!_usuarioInscrito &&
+              !isCompleto &&
+              _partido!.jugadoresFaltantes > 1) ...[
             const SizedBox(height: 8),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                key: _inscribirEquipoKey, // Key para el tutorial
-                onPressed: _procesandoSolicitud ? null : _mostrarDialogoSeleccionEquipo,
+                key: _inscribirEquipoKey,
+                onPressed: _procesandoSolicitud
+                    ? null
+                    : _mostrarDialogoSeleccionEquipo,
                 icon: const Icon(Icons.group_add, size: 20),
                 label: const Text(
                   'Pagar e inscribir equipo',
@@ -1269,4 +1284,3 @@ class _DetallePartidoViewState extends State<DetallePartidoView> {
     );
   }
 }
-
