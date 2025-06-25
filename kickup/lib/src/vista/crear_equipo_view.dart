@@ -4,10 +4,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:io';
 
-/** Vista para crear un nuevo equipo.
- * Permite al usuario ingresar información del equipo como nombre, tipo,
- * descripción, nivel y logo. Integra con Firebase para almacenar los datos
- * y subir imágenes. Incluye animaciones y validación de formulario.
+/** Vista para crear un nuevo equipo con validaciones mejoradas.
+ * Evita nombres y descripciones compuestos solo de espacios o tabulaciones.
+ * Incluye validación robusta de contenido significativo.
  */
 class CrearEquipoView extends StatefulWidget {
   /** ID del usuario que está creando el equipo */
@@ -104,10 +103,92 @@ class _CrearEquipoViewState extends State<CrearEquipoView>
     super.dispose();
   }
 
-  /** Muestra opciones para seleccionar imagen con diseño mejorado.
-   * Presenta un modal con opciones para seleccionar desde galería,
-   * cámara o eliminar la imagen actual si existe.
-   */
+  /** Valida que el texto contenga contenido significativo */
+  String? _validateMeaningfulText(String? value, String fieldName, int minLength) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Por favor ingresa $fieldName';
+    }
+
+    final trimmedValue = value.trim();
+    
+    // Verificar que no contenga solo espacios o tabulaciones
+    if (trimmedValue.replaceAll(RegExp(r'[\s\t]+'), '').isEmpty) {
+      return '$fieldName no puede contener solo espacios';
+    }
+
+    // Verificar longitud mínima del contenido real
+    if (trimmedValue.length < minLength) {
+      return '$fieldName debe tener al menos $minLength caracteres';
+    }
+
+    // Verificar que contenga al menos algunas letras o números
+    final RegExp meaningfulCharsRegex = RegExp(r'[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ0-9]');
+    if (!meaningfulCharsRegex.hasMatch(trimmedValue)) {
+      return '$fieldName debe contener al menos una letra o número';
+    }
+
+    // Verificar que no tenga espacios múltiples consecutivos
+    if (trimmedValue.contains(RegExp(r'\s{2,}'))) {
+      return '$fieldName no puede tener espacios múltiples consecutivos';
+    }
+
+    // Verificar que no contenga solo caracteres especiales
+    final meaningfulCharsCount = meaningfulCharsRegex.allMatches(trimmedValue).length;
+    if (meaningfulCharsCount < 2) {
+      return '$fieldName debe contener al menos 2 caracteres válidos';
+    }
+
+    return null;
+  }
+
+  /** Valida el nombre del equipo */
+  String? _validateNombre(String? value) {
+    final basicValidation = _validateMeaningfulText(value, 'un nombre', 3);
+    if (basicValidation != null) return basicValidation;
+
+    final trimmedValue = value!.trim();
+    
+    // Verificar longitud máxima
+    if (trimmedValue.length > 50) {
+      return 'El nombre no puede exceder 50 caracteres';
+    }
+
+    // Verificar que no contenga caracteres peligrosos
+    final RegExp dangerousCharsRegex = RegExp(r'[<>{}[\]\\|`~]');
+    if (dangerousCharsRegex.hasMatch(trimmedValue)) {
+      return 'El nombre contiene caracteres no permitidos';
+    }
+
+    return null;
+  }
+
+  /** Valida la descripción del equipo */
+  String? _validateDescripcion(String? value) {
+    final basicValidation = _validateMeaningfulText(value, 'una descripción', 10);
+    if (basicValidation != null) return basicValidation;
+
+    final trimmedValue = value!.trim();
+    
+    // Verificar longitud máxima
+    if (trimmedValue.length > 500) {
+      return 'La descripción no puede exceder 500 caracteres';
+    }
+
+    // Verificar que tenga contenido descriptivo mínimo
+    final words = trimmedValue.split(RegExp(r'\s+'));
+    if (words.length < 3) {
+      return 'La descripción debe tener al menos 3 palabras';
+    }
+
+    return null;
+  }
+
+  /** Limpia y formatea el texto eliminando espacios extra */
+  String _cleanText(String text) {
+    return text.trim().replaceAll(RegExp(r'\s+'), ' ');
+  }
+
+  /** Muestra opciones para seleccionar imagen con diseño mejorado */
   Future<void> _mostrarOpcionesImagen() async {
     final ImageSource? source = await showModalBottomSheet<ImageSource>(
       context: context,
@@ -190,12 +271,7 @@ class _CrearEquipoViewState extends State<CrearEquipoView>
     }
   }
 
-  /** Construye un widget para una opción de selección de imagen.
-   * @param icon Icono a mostrar
-   * @param label Texto descriptivo
-   * @param color Color del contenedor y el icono
-   * @param onTap Función a ejecutar al tocar
-   */
+  /** Construye un widget para una opción de selección de imagen */
   Widget _buildImageOption({
     required IconData icon,
     required String label,
@@ -231,10 +307,7 @@ class _CrearEquipoViewState extends State<CrearEquipoView>
     );
   }
 
-  /** Selecciona una imagen desde la fuente especificada (cámara o galería).
-   * Actualiza el estado para mostrar la imagen seleccionada.
-   * @param source Fuente de la imagen (cámara o galería)
-   */
+  /** Selecciona una imagen desde la fuente especificada */
   Future<void> _seleccionarImagen(ImageSource source) async {
     setState(() => _subiendoImagen = true);
 
@@ -269,11 +342,7 @@ class _CrearEquipoViewState extends State<CrearEquipoView>
     }
   }
 
-  /** Sube el logo del equipo a Firebase Storage y devuelve la URL.
-   * @param logo Archivo de imagen a subir
-   * @param equipoId ID del equipo para nombrar el archivo
-   * @return URL de descarga de la imagen subida
-   */
+  /** Sube el logo del equipo a Firebase Storage */
   Future<String?> subirLogoEquipo(File logo, String equipoId) async {
     final storageRef =
         FirebaseStorage.instance.ref().child('equipos').child('$equipoId.jpg');
@@ -281,10 +350,7 @@ class _CrearEquipoViewState extends State<CrearEquipoView>
     return await uploadTask.ref.getDownloadURL();
   }
 
-  /** Muestra el selector de tipo de equipo en un modal.
-   * Permite al usuario elegir entre diferentes tipos de equipos
-   * con una interfaz visual mejorada.
-   */
+  /** Muestra el selector de tipo de equipo en un modal */
   void _mostrarSelectorTipo() {
     showModalBottomSheet(
       context: context,
@@ -419,11 +485,7 @@ class _CrearEquipoViewState extends State<CrearEquipoView>
     );
   }
 
-  /** Guarda el equipo en Firestore.
-   * Valida el formulario, sube el logo si existe y crea el documento
-   * del equipo con toda la información. Incluye al creador como primer
-   * miembro del equipo.
-   */
+  /** Guarda el equipo en Firestore con datos limpiados */
   Future<void> _guardarEquipo() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
@@ -450,30 +512,30 @@ class _CrearEquipoViewState extends State<CrearEquipoView>
           ),
         );
 
-        // 1. Genera el ID del equipo
+        // Genera el ID del equipo
         final equipoId = 'equipo_${DateTime.now().millisecondsSinceEpoch}';
 
-        // 2. Sube el logo si existe
+        // Sube el logo si existe
         String logoUrl = '';
         if (_logoImage != null) {
           logoUrl = await subirLogoEquipo(_logoImage!, equipoId) ?? '';
         }
 
-        // 3. Obtén los datos del usuario creador
+        // Obtenemos los datos del usuario creador
         final usuarioDoc = await FirebaseFirestore.instance
             .collection('usuarios')
             .doc(widget.userId)
             .get();
         final userData = usuarioDoc.data();
 
-        // 4. Crea el modelo/mapa de equipo con jugadores y jugadoresIds
+        // Crea el modelo/mapa de equipo con datos limpiados
         final equipoMap = {
           'id': equipoId,
-          'nombre': _nombreController.text,
+          'nombre': _cleanText(_nombreController.text),
           'tipo': _tipoSeleccionado,
           'logoUrl': logoUrl,
-          'descripcion': _descripcionController.text,
-          'nivel': int.tryParse(_nivelController.text) ?? 1,
+          'descripcion': _cleanText(_descripcionController.text),
+          'nivel': int.tryParse(_nivelController.text.trim()) ?? 1,
           'jugadoresIds': [widget.userId],
           'jugadores': [
             {
@@ -484,9 +546,11 @@ class _CrearEquipoViewState extends State<CrearEquipoView>
               'profileImageUrl': userData?['profileImageUrl'] ?? '',
             }
           ],
+          'createdAt': FieldValue.serverTimestamp(),
+          'creadorId': widget.userId,
         };
 
-        // 5. Guarda el equipo en Firestore
+        // Guarda el equipo en Firestore
         await FirebaseFirestore.instance
             .collection('equipos')
             .doc(equipoId)
@@ -541,7 +605,7 @@ class _CrearEquipoViewState extends State<CrearEquipoView>
     );
   }
 
-  /** Construye el AppBar mejorado con estilo personalizado */
+  /** Construye el AppBar con estilo personalizado */
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       backgroundColor: Colors.transparent,
@@ -701,7 +765,7 @@ class _CrearEquipoViewState extends State<CrearEquipoView>
     );
   }
 
-  /** Construye el campo de nombre con validación */
+  /** Construye el campo de nombre con validación mejorada */
   Widget _buildNombreField() {
     return _buildFieldContainer(
       label: 'Nombre del equipo',
@@ -709,15 +773,7 @@ class _CrearEquipoViewState extends State<CrearEquipoView>
       child: _buildTextField(
         controller: _nombreController,
         hintText: 'Ej: FC Barcelona',
-        validator: (value) {
-          if (value == null || value.isEmpty) {
-            return 'Por favor ingresa un nombre';
-          }
-          if (value.length < 3) {
-            return 'El nombre debe tener al menos 3 caracteres';
-          }
-          return null;
-        },
+        validator: _validateNombre,
       ),
     );
   }
@@ -734,7 +790,7 @@ class _CrearEquipoViewState extends State<CrearEquipoView>
         onTap: _mostrarSelectorTipo,
         suffixIcon: const Icon(Icons.arrow_drop_down),
         validator: (value) {
-          if (value == null || value.isEmpty) {
+          if (value == null || value.trim().isEmpty) {
             return 'Por favor selecciona un tipo';
           }
           return null;
@@ -753,10 +809,10 @@ class _CrearEquipoViewState extends State<CrearEquipoView>
         hintText: 'Nivel del 1 al 5',
         keyboardType: TextInputType.number,
         validator: (value) {
-          if (value == null || value.isEmpty) {
+          if (value == null || value.trim().isEmpty) {
             return 'Por favor ingresa el nivel';
           }
-          final nivel = int.tryParse(value);
+          final nivel = int.tryParse(value.trim());
           if (nivel == null || nivel < 1 || nivel > 5) {
             return 'El nivel debe ser un número entre 1 y 5';
           }
@@ -766,7 +822,7 @@ class _CrearEquipoViewState extends State<CrearEquipoView>
     );
   }
 
-  /** Construye el campo de descripción multilinea */
+  /** Construye el campo de descripción con validación mejorada */
   Widget _buildDescripcionField() {
     return _buildFieldContainer(
       label: 'Descripción',
@@ -776,24 +832,12 @@ class _CrearEquipoViewState extends State<CrearEquipoView>
         hintText: 'Describe tu equipo, objetivos, horarios...',
         keyboardType: TextInputType.multiline,
         maxLines: 4,
-        validator: (value) {
-          if (value == null || value.isEmpty) {
-            return 'Por favor escribe una descripción';
-          }
-          if (value.length < 10) {
-            return 'La descripción debe tener al menos 10 caracteres';
-          }
-          return null;
-        },
+        validator: _validateDescripcion,
       ),
     );
   }
 
-  /** Construye un contenedor de campo con etiqueta e icono.
-   * @param label Etiqueta del campo
-   * @param icon Icono representativo
-   * @param child Widget hijo (generalmente un TextField)
-   */
+  /** Construye un contenedor de campo con etiqueta e icono */
   Widget _buildFieldContainer({
     required String label,
     required IconData icon,
@@ -911,16 +955,7 @@ class _CrearEquipoViewState extends State<CrearEquipoView>
     );
   }
 
-  /** Construye un campo de texto con estilo personalizado.
-   * @param controller Controlador del campo
-   * @param hintText Texto de ayuda
-   * @param keyboardType Tipo de teclado
-   * @param readOnly Si es de solo lectura
-   * @param onTap Función al tocar
-   * @param suffixIcon Icono al final del campo
-   * @param validator Función de validación
-   * @param maxLines Número máximo de líneas
-   */
+  /** Construye un campo de texto con estilo personalizado */
   Widget _buildTextField({
     required TextEditingController controller,
     required String hintText,

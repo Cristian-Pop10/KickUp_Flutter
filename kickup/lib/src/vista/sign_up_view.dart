@@ -6,11 +6,10 @@ import '../modelo/signup_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'partidos_view.dart';
 
-/** Vista de registro de usuarios.
- * Permite a nuevos usuarios crear una cuenta proporcionando
- * información personal y deportiva. Incluye validación de campos,
- * selección de posición de juego y navegación a la vista principal
- * tras un registro exitoso.
+/** Vista de registro de usuarios con validaciones.
+ * Permite emojis en nombres cuando van acompañados de letras válidas,
+ * pero evita nombres compuestos solo de emojis o espacios.
+ * Incluye texto negro en formularios para modo oscuro.
  */
 class RegistroView extends StatefulWidget {
   const RegistroView({Key? key}) : super(key: key);
@@ -57,6 +56,112 @@ class _RegistroViewState extends State<RegistroView> {
     super.dispose();
   }
 
+  /** Obtiene el color de texto para los formularios según el tema */
+  Color _getFormTextColor(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    return brightness == Brightness.dark ? Colors.black : Colors.black87;
+  }
+
+  /** Obtiene el color de hint text para los formularios según el tema */
+  Color _getFormHintColor(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    return brightness == Brightness.dark ? Colors.black54 : Colors.grey[600]!;
+  }
+
+  /** Valida nombres permitiendo emojis cuando van acompañados de letras */
+  String? _validateName(String? value, String fieldName) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Introduce $fieldName';
+    }
+
+    final trimmedValue = value.trim();
+    
+    // Verificar longitud mínima y máxima
+    if (trimmedValue.length < 2) {
+      return '$fieldName debe tener al menos 2 caracteres';
+    }
+    
+    if (trimmedValue.length > 50) {
+      return '$fieldName no puede exceder 50 caracteres';
+    }
+
+    // Verificar que no contenga solo espacios
+    if (trimmedValue.replaceAll(' ', '').isEmpty) {
+      return '$fieldName no puede contener solo espacios';
+    }
+
+    // CLAVE: Verificar que contenga al menos algunas letras válidas
+    final RegExp letterRegex = RegExp(r'[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ]');
+    if (!letterRegex.hasMatch(trimmedValue)) {
+      return '$fieldName debe contener al menos una letra válida';
+    }
+
+    // Contar cuántas letras válidas tiene
+    final lettersCount = letterRegex.allMatches(trimmedValue).length;
+    if (lettersCount < 2) {
+      return '$fieldName debe contener al menos 2 letras válidas';
+    }
+
+    // Verificar que no tenga espacios múltiples consecutivos
+    if (trimmedValue.contains(RegExp(r'\s{2,}'))) {
+      return '$fieldName no puede tener espacios múltiples consecutivos';
+    }
+
+    // Verificar que no contenga caracteres peligrosos o de control
+    final RegExp dangerousCharsRegex = RegExp(r'[<>{}[\]\\|`~]');
+    if (dangerousCharsRegex.hasMatch(trimmedValue)) {
+      return '$fieldName contiene caracteres no permitidos';
+    }
+
+    // Verificar que empiece con una letra
+    if (!RegExp(r'^[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ]').hasMatch(trimmedValue)) {
+      return '$fieldName debe empezar con una letra';
+    }
+
+    return null;
+  }
+
+  /** Valida la edad con restricciones */
+  String? _validateAge(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Introduce tu edad';
+    }
+
+    final edad = int.tryParse(value.trim());
+    
+    if (edad == null) {
+      return 'La edad debe ser un número válido';
+    }
+
+    if (edad < 16) {
+      return 'Debes tener al menos 16 años para registrarte';
+    }
+
+    if (edad > 80) {
+      return 'La edad no puede ser mayor a 80 años';
+    }
+
+    return null;
+  }
+
+  /** Valida el número de teléfono con formato español */
+  String? _validatePhone(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Introduce tu teléfono';
+    }
+
+    final trimmedValue = value.trim().replaceAll(' ', '').replaceAll('-', '');
+    
+    // Verificar que solo contenga números y el símbolo +
+    final RegExp phoneRegex = RegExp(r'^(\+34)?[6-9]\d{8}$');
+    
+    if (!phoneRegex.hasMatch(trimmedValue)) {
+      return 'Introduce un teléfono válido (ej: 612345678 o +34612345678)';
+    }
+
+    return null;
+  }
+
   /** Procesa el registro del usuario con los datos del formulario */
   Future<void> _register() async {
     if (_formKey.currentState!.validate()) {
@@ -65,27 +170,39 @@ class _RegistroViewState extends State<RegistroView> {
       });
 
       SignupModel(
-        email: _emailController.text,
+        email: _emailController.text.trim(),
         password: _passwordController.text,
       );
 
-      // Función auxiliar para capitalizar la primera letra
-      String _capitalizeFirstLetter(String text) {
-        if (text.isEmpty) return text;
-        return text[0].toUpperCase() + text.substring(1);
+      // Función auxiliar para limpiar y capitalizar nombres 
+      String _cleanAndCapitalizeName(String text) {
+        final cleaned = text.trim().replaceAll(RegExp(r'\s+'), ' ');
+        
+        // Dividir por espacios y capitalizar solo las palabras que empiecen con letra
+        return cleaned.split(' ').map((word) {
+          if (word.isEmpty) return '';
+          
+          // Si la palabra empieza con letra, capitalizarla
+          if (RegExp(r'^[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ]').hasMatch(word)) {
+            return word[0].toUpperCase() + word.substring(1).toLowerCase();
+          }
+          
+          // Si empieza con emoji u otro carácter, devolverla tal como está
+          return word;
+        }).join(' ');
       }
 
-      // Crea el UserModel con los datos del formulario
+      // Crea el UserModel con los datos del formulario limpiados
       final user = UserModel(
         id: null,
-        email: _emailController.text,
+        email: _emailController.text.trim(),
         password: _passwordController.text,
-        edad: int.tryParse(_edadController.text),
-        nivel: int.tryParse(_nivelController.text),
+        edad: int.tryParse(_edadController.text.trim()),
+        nivel: int.tryParse(_nivelController.text.trim()),
         posicion: _posicionController.text,
-        telefono: _telefonoController.text,
-        nombre: _capitalizeFirstLetter(_nombreController.text),
-        apellidos: _capitalizeFirstLetter(_apellidosController.text),
+        telefono: _telefonoController.text.trim().replaceAll(' ', '').replaceAll('-', ''),
+        nombre: _cleanAndCapitalizeName(_nombreController.text),
+        apellidos: _cleanAndCapitalizeName(_apellidosController.text),
       );
 
       // Intenta registrar al usuario
@@ -97,7 +214,14 @@ class _RegistroViewState extends State<RegistroView> {
 
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Registro exitoso')),
+          SnackBar(
+            content: const Text('Registro exitoso'),
+            backgroundColor: Colors.green,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
 
         // Navega a la vista principal si el registro fue exitoso
@@ -112,7 +236,14 @@ class _RegistroViewState extends State<RegistroView> {
         }
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error en el registro')),
+          SnackBar(
+            content: const Text('Error en el registro. Inténtalo de nuevo.'),
+            backgroundColor: Colors.red,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     }
@@ -165,6 +296,10 @@ class _RegistroViewState extends State<RegistroView> {
                           TextFormField(
                             controller: _emailController,
                             validator: _authController.validateEmail,
+                            style: TextStyle(
+                              color: _getFormTextColor(context),
+                              fontSize: 16,
+                            ),
                             decoration: InputDecoration(
                               filled: true,
                               fillColor: Colors.grey[300],
@@ -193,6 +328,10 @@ class _RegistroViewState extends State<RegistroView> {
                           TextFormField(
                             controller: _passwordController,
                             validator: _authController.validatePassword,
+                            style: TextStyle(
+                              color: _getFormTextColor(context),
+                              fontSize: 16,
+                            ),
                             decoration: InputDecoration(
                               filled: true,
                               fillColor: Colors.grey[300],
@@ -209,7 +348,6 @@ class _RegistroViewState extends State<RegistroView> {
                           ),
                           const SizedBox(height: 20),
                           
-                          // Campo de nombre
                           const Text(
                             'Nombre',
                             style: TextStyle(
@@ -220,11 +358,11 @@ class _RegistroViewState extends State<RegistroView> {
                           const SizedBox(height: 8),
                           TextFormField(
                             controller: _nombreController,
-                            validator: (value) {
-                              if (value == null || value.isEmpty)
-                                return 'Introduce nombre';
-                              return null;
-                            },
+                            validator: (value) => _validateName(value, 'el nombre'),
+                            style: TextStyle(
+                              color: _getFormTextColor(context),
+                              fontSize: 16,
+                            ),
                             decoration: InputDecoration(
                               filled: true,
                               fillColor: Colors.grey[300],
@@ -234,10 +372,14 @@ class _RegistroViewState extends State<RegistroView> {
                               ),
                               contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 20, vertical: 16),
+                              hintStyle: TextStyle(
+                                color: _getFormHintColor(context),
+                              ),
                             ),
+                            textCapitalization: TextCapitalization.words,
                           ),
+                          const SizedBox(height: 20),
                           
-                          // Campo de apellidos
                           const Text(
                             'Apellidos',
                             style: TextStyle(
@@ -248,11 +390,11 @@ class _RegistroViewState extends State<RegistroView> {
                           const SizedBox(height: 8),
                           TextFormField(
                             controller: _apellidosController,
-                            validator: (value) {
-                              if (value == null || value.isEmpty)
-                                return 'Introduce tus apellidos';
-                              return null;
-                            },
+                            validator: (value) => _validateName(value, 'los apellidos'),
+                            style: TextStyle(
+                              color: _getFormTextColor(context),
+                              fontSize: 16,
+                            ),
                             decoration: InputDecoration(
                               filled: true,
                               fillColor: Colors.grey[300],
@@ -262,13 +404,16 @@ class _RegistroViewState extends State<RegistroView> {
                               ),
                               contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 20, vertical: 16),
+                              hintStyle: TextStyle(
+                                color: _getFormHintColor(context),
+                              ),
                             ),
+                            textCapitalization: TextCapitalization.words,
                           ),
                           const SizedBox(height: 20),
                           
-                          // Campo de edad
                           const Text(
-                            'Edad',
+                            'Edad (mínimo 16 años)',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 18,
@@ -277,14 +422,11 @@ class _RegistroViewState extends State<RegistroView> {
                           const SizedBox(height: 8),
                           TextFormField(
                             controller: _edadController,
-                            validator: (value) {
-                              if (value == null || value.isEmpty)
-                                return 'Introduce tu edad';
-                              final edad = int.tryParse(value);
-                              if (edad == null || edad < 0 || edad > 80)
-                                return 'Edad no válida';
-                              return null;
-                            },
+                            validator: _validateAge,
+                            style: TextStyle(
+                              color: _getFormTextColor(context),
+                              fontSize: 16,
+                            ),
                             decoration: InputDecoration(
                               filled: true,
                               fillColor: Colors.grey[300],
@@ -294,12 +436,14 @@ class _RegistroViewState extends State<RegistroView> {
                               ),
                               contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 20, vertical: 16),
+                              hintStyle: TextStyle(
+                                color: _getFormHintColor(context),
+                              ),
                             ),
                             keyboardType: TextInputType.number,
                           ),
                           const SizedBox(height: 20),
                           
-                          // Campo de nivel de juego
                           const Text(
                             'Nivel (1-5)',
                             style: TextStyle(
@@ -311,13 +455,19 @@ class _RegistroViewState extends State<RegistroView> {
                           TextFormField(
                             controller: _nivelController,
                             validator: (value) {
-                              if (value == null || value.isEmpty)
+                              if (value == null || value.trim().isEmpty) {
                                 return 'Introduce tu nivel (1-5)';
-                              final nivel = int.tryParse(value);
-                              if (nivel == null || nivel < 1 || nivel > 5)
-                                return 'Nivel entre 1 y 5';
+                              }
+                              final nivel = int.tryParse(value.trim());
+                              if (nivel == null || nivel < 1 || nivel > 5) {
+                                return 'El nivel debe estar entre 1 y 5';
+                              }
                               return null;
                             },
+                            style: TextStyle(
+                              color: _getFormTextColor(context),
+                              fontSize: 16,
+                            ),
                             decoration: InputDecoration(
                               filled: true,
                               fillColor: Colors.grey[300],
@@ -327,12 +477,15 @@ class _RegistroViewState extends State<RegistroView> {
                               ),
                               contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 20, vertical: 16),
+                              hintText: '1 = Principiante, 5 = Experto',
+                              hintStyle: TextStyle(
+                                color: _getFormHintColor(context),
+                              ),
                             ),
                             keyboardType: TextInputType.number,
                           ),
                           const SizedBox(height: 20),
                           
-                          // Selector de posición
                           const Text(
                             'Posición',
                             style: TextStyle(
@@ -343,7 +496,16 @@ class _RegistroViewState extends State<RegistroView> {
                           const SizedBox(height: 8),
                           DropdownButtonFormField<String>(
                             value: _posicionSeleccionada,
-                            hint: const Text("Selecciona una posición"),
+                            hint: Text(
+                              "Selecciona una posición",
+                              style: TextStyle(
+                                color: _getFormHintColor(context),
+                              ),
+                            ),
+                            style: TextStyle(
+                              color: _getFormTextColor(context),
+                              fontSize: 16,
+                            ),
                             decoration: InputDecoration(
                               filled: true,
                               fillColor: Colors.grey[300],
@@ -360,7 +522,10 @@ class _RegistroViewState extends State<RegistroView> {
                                 child: Text(
                                   posicion[0].toUpperCase() +
                                       posicion.substring(1),
-                                  style: const TextStyle(fontSize: 16),
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: _getFormTextColor(context),
+                                  ),
                                 ),
                               );
                             }).toList(),
@@ -371,14 +536,14 @@ class _RegistroViewState extends State<RegistroView> {
                               });
                             },
                             validator: (value) {
-                              if (value == null || value.isEmpty)
+                              if (value == null || value.isEmpty) {
                                 return 'Selecciona tu posición';
+                              }
                               return null;
                             },
                           ),
                           const SizedBox(height: 20),
                           
-                          // Campo de teléfono
                           const Text(
                             'Teléfono',
                             style: TextStyle(
@@ -389,12 +554,11 @@ class _RegistroViewState extends State<RegistroView> {
                           const SizedBox(height: 8),
                           TextFormField(
                             controller: _telefonoController,
-                            validator: (value) {
-                              if (value == null || value.isEmpty)
-                                return 'Introduce tu teléfono';
-                              if (value.length < 9) return 'Teléfono no válido';
-                              return null;
-                            },
+                            validator: _validatePhone,
+                            style: TextStyle(
+                              color: _getFormTextColor(context),
+                              fontSize: 16,
+                            ),
                             decoration: InputDecoration(
                               filled: true,
                               fillColor: Colors.grey[300],
@@ -404,6 +568,10 @@ class _RegistroViewState extends State<RegistroView> {
                               ),
                               contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 20, vertical: 16),
+                              hintText: 'Ej: 612345678 o +34612345678',
+                              hintStyle: TextStyle(
+                                color: _getFormHintColor(context),
+                              ),
                             ),
                             keyboardType: TextInputType.phone,
                           ),

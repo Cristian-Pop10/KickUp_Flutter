@@ -76,7 +76,7 @@ class AuthController {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('user_id', userId);
 
-        // CAMBIO: Verificar si es admin antes de navegar
+        // Verificar si es admin antes de navegar
         await _navigateBasedOnUserType(context, userId);
       } else if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

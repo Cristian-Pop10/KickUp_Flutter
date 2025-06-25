@@ -152,7 +152,6 @@ class _PartidosViewState extends State<PartidosView> {
     return meses[mes - 1];
   }
 
-
   /** Maneja la navegación entre pestañas de la barra inferior */
   void _onNavBarTap(int index) {
     setState(() {
@@ -253,11 +252,11 @@ class _PartidosViewState extends State<PartidosView> {
     TutorialCoachMark(
       targets: targets,
       colorShadow: Colors.black,
-      textSkip: "Saltar",
+      textSkip: "Saltar tutorial",
       paddingFocus: 8,
       opacityShadow: 0.8,
       onFinish: () {
-        // Navegar al siguiente paso del tutorial
+        // Al completar el tutorial, continuar al siguiente paso
         if (_partidos.isNotEmpty && userId != null) {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
@@ -278,25 +277,15 @@ class _PartidosViewState extends State<PartidosView> {
         return false;
       },
       onSkip: () {
-        // Mismo comportamiento al saltar el tutorial
-        if (_partidos.isNotEmpty && userId != null) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (_) => DetallePartidoView(
-                partidoId: _partidos.first.id,
-                userId: userId!,
-                showTutorial: true,
-              ),
-            ),
-          );
-        } else {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (_) => EquiposView(showTutorial: true),
-            ),
-          );
-        }
-        return false;
+        // Al saltar, ir directamente al final del tutorial
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Tutorial saltado. ¡Explora la app por tu cuenta!'),
+            backgroundColor: Colors.blue,
+          ),
+        );
+        // No navegar a ningún sitio, quedarse en la vista actual
+        return true;
       },
     ).show(context: context);
   }
